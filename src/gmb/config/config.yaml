@@ -1,0 +1,10 @@
+# GMB Fantasy Football Dashboard Configuration
+
+# Your ESPN Fantasy Football League ID
+league_id: 294338
+year: 2025
+
+# Your ESPN authentication credentials
+# These will be stored in your system keyring for security
+espn_s2: "AEBSDixHAnph13OckpCPBf%2Fmh56AFZXEHfwVQvJzjtx3gBAarifgBw6AGAi3fL9RwXwouINIOAktu2Depgm3oUMBBetd1xgieyST9KbrHhE2ck7FfoLR38rRfy9EoPTAa%2Ffk67gyFNcYbsbj4TyIkJ5T%2BKxdcuFI3qRkY4J76pWbQ6TWJiAQheR1ajkK%2Fy25ygjKyQ9rcQWh74yx5A3rPtkWrDAbxpfFkdDYf3NFdV0l38lBRC1jlxyhbOWRQ9jYZHlS1ZBeuAo5kkvSud5zqP%2F7vSb%2BWsEn%2BzRPA%2BNd4muvuA%3D%3D"
+swid: "{53CA2B64-EB4D-4443-AE3F-9A0E6D1A6654}"

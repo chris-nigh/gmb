@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gmb"
+version = "0.1.0"
+description = "GMB Fantasy Football Dashboard"
+readme = "README.md"
+authors = [
+    { name = "Christopher Nigh", email = "user@example.com" }
+]
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=2.0.0",
+    "requests>=2.31.0",
+    "matplotlib>=3.7.0",
+    "streamlit>=1.24.0",
+    "plotly>=5.18.0",
+    "pyyaml>=6.0",
+    "keyring>=24.0.0",
+    "typer>=0.9.0",
+    "rich>=13.6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gmb"]
+include = ["src/gmb/config/*.yaml"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.9.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+]
+
+[project.scripts]
+gmb = "gmb.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/cnigh/gmb"
+Documentation = "https://github.com/cnigh/gmb/wiki"
+Repository = "https://github.com/cnigh/gmb.git"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
