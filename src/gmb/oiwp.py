@@ -7,6 +7,7 @@ class TeamOIWP:
     def __init__(self, name: str, current_week: int, total_teams: int):
         self._name: str = name
         self._wins: int = 0
+        self._losses: int = 0
         self._oiwins: int = 0
         self._current_week = current_week
         self._total_teams = total_teams
@@ -36,8 +37,38 @@ class TeamOIWP:
     def luck(self) -> float:
         return self.wp - self.oiwp
 
+    @property
+    def record(self) -> str:
+        """Return actual record as 'W-L' string."""
+        return f"{self._wins}-{self._losses}"
+
+    @property
+    def predicted_record(self) -> str:
+        """Return OIWP-predicted record as 'W-L' string.
+
+        Predicted wins are calculated by rounding OIWP * games played.
+        """
+        games_played = self._wins + self._losses
+        predicted_wins = round(self.oiwp * games_played)
+        predicted_losses = games_played - predicted_wins
+        return f"{predicted_wins}-{predicted_losses}"
+
+    @property
+    def schedule_wins(self) -> int:
+        """Return schedule wins: actual wins minus predicted wins.
+
+        Positive values indicate favorable schedule (more wins than expected).
+        Negative values indicate tough schedule (fewer wins than expected).
+        """
+        games_played = self._wins + self._losses
+        predicted_wins = round(self.oiwp * games_played)
+        return self._wins - predicted_wins
+
     def add_win(self) -> None:
         self._wins += 1
+
+    def add_loss(self) -> None:
+        self._losses += 1
 
     def add_oiwins(self, week_wins: int) -> None:
         """Add wins for a given week.
@@ -144,10 +175,12 @@ def calculate_oiwp_stats(matchups_df: pd.DataFrame) -> pd.DataFrame:
     for team in matchups_df['team_name'].unique():
         team_dict[team] = TeamOIWP(team, current_week, total_teams)
 
-    # Calculate actual wins
+    # Calculate actual wins and losses
     for _, row in matchups_df.iterrows():
         if row['points'] > row['opponent_points']:
             team_dict[row['team_name']].add_win()
+        elif row['points'] < row['opponent_points']:
+            team_dict[row['team_name']].add_loss()
 
     # Calculate OIWP - for each week, compare each team's score against every other team
     for week in range(1, current_week + 1):
@@ -168,9 +201,12 @@ def calculate_oiwp_stats(matchups_df: pd.DataFrame) -> pd.DataFrame:
     for team in team_dict.values():
         results.append({
             'team_name': team.name,
+            'record': team.record,
+            'predicted_record': team.predicted_record,
             'wp': team.wp,
             'oiwp': team.oiwp,
-            'luck': team.luck
+            'luck': team.luck,
+            'schedule_wins': team.schedule_wins
         })
 
     results_df = pd.DataFrame(results).sort_values('oiwp', ascending=False)

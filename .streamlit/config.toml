@@ -11,8 +11,10 @@ enableXsrfProtection = true
 gatherUsageStats = false
 
 [theme]
-primaryColor = "#FF6B35"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
+# Vermont Green Mountains theme
+# Colors inspired by Vermont's forests, mountains, and autumn foliage
+primaryColor = "#2D5F3F"        # Deep forest green (Vermont's evergreen forests)
+backgroundColor = "#F5F3EE"      # Soft cream (morning mist over mountains)
+secondaryBackgroundColor = "#E8E5DC"  # Light sage (mountain meadows)
+textColor = "#1A3329"            # Dark pine (deep forest)
 font = "sans serif"

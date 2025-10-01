@@ -103,6 +103,95 @@ class TestTeamOIWP:
         assert "oiwp=" in repr_str
         assert "luck=" in repr_str
 
+    def test_record(self):
+        """Test actual record calculation."""
+        team = TeamOIWP("Team A", current_week=4, total_teams=12)
+        team.add_win()
+        team.add_win()
+        team.add_win()
+        team.add_loss()
+
+        assert team.record == "3-1"
+
+    def test_predicted_record(self):
+        """Test predicted record based on OIWP."""
+        team = TeamOIWP("Team A", current_week=4, total_teams=12)
+        # Actual record: 3-1 (75% win rate)
+        team.add_win()
+        team.add_win()
+        team.add_win()
+        team.add_loss()
+
+        # OIWP wins: 22 out of 44 possible (50% win rate)
+        team.add_oiwins(22)
+
+        # With 50% OIWP over 4 games, predicted record should be 2-2
+        assert team.predicted_record == "2-2"
+
+    def test_predicted_record_rounding(self):
+        """Test predicted record rounding behavior."""
+        team = TeamOIWP("Team A", current_week=5, total_teams=10)
+        # Actual record: 2-3
+        team.add_win()
+        team.add_win()
+        team.add_loss()
+        team.add_loss()
+        team.add_loss()
+
+        # OIWP wins: 26 out of 45 possible (~57.8% win rate)
+        team.add_oiwins(26)
+
+        # With 57.8% OIWP over 5 games, predicted wins = round(0.578 * 5) = 3
+        assert team.predicted_record == "3-2"
+
+    def test_schedule_wins_positive(self):
+        """Test schedule_wins with favorable schedule (more wins than predicted)."""
+        team = TeamOIWP("Team A", current_week=4, total_teams=12)
+        # Actual record: 3-1 (75% win rate)
+        team.add_win()
+        team.add_win()
+        team.add_win()
+        team.add_loss()
+
+        # OIWP wins: 22 out of 44 possible (50% win rate)
+        team.add_oiwins(22)
+
+        # With 50% OIWP over 4 games, predicted wins = 2
+        # Actual wins = 3, so schedule_wins = 3 - 2 = +1
+        assert team.schedule_wins == 1
+
+    def test_schedule_wins_negative(self):
+        """Test schedule_wins with tough schedule (fewer wins than predicted)."""
+        team = TeamOIWP("Team A", current_week=4, total_teams=12)
+        # Actual record: 1-3 (25% win rate)
+        team.add_win()
+        team.add_loss()
+        team.add_loss()
+        team.add_loss()
+
+        # OIWP wins: 22 out of 44 possible (50% win rate)
+        team.add_oiwins(22)
+
+        # With 50% OIWP over 4 games, predicted wins = 2
+        # Actual wins = 1, so schedule_wins = 1 - 2 = -1
+        assert team.schedule_wins == -1
+
+    def test_schedule_wins_zero(self):
+        """Test schedule_wins when actual matches predicted."""
+        team = TeamOIWP("Team A", current_week=4, total_teams=12)
+        # Actual record: 2-2 (50% win rate)
+        team.add_win()
+        team.add_win()
+        team.add_loss()
+        team.add_loss()
+
+        # OIWP wins: 22 out of 44 possible (50% win rate)
+        team.add_oiwins(22)
+
+        # With 50% OIWP over 4 games, predicted wins = 2
+        # Actual wins = 2, so schedule_wins = 2 - 2 = 0
+        assert team.schedule_wins == 0
+
 
 class TestCalculateOIWPStats:
     """Test suite for calculate_oiwp_stats function."""
@@ -123,9 +212,12 @@ class TestCalculateOIWPStats:
         assert isinstance(stats, pd.DataFrame)
         assert len(stats) == 2
         assert 'team_name' in stats.columns
+        assert 'record' in stats.columns
+        assert 'predicted_record' in stats.columns
         assert 'wp' in stats.columns
         assert 'oiwp' in stats.columns
         assert 'luck' in stats.columns
+        assert 'schedule_wins' in stats.columns
 
     def test_sorted_by_oiwp(self):
         """Test that results are sorted by OIWP descending."""

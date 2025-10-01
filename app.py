@@ -7,10 +7,142 @@ from gmb.oiwp import calculate_oiwp_stats
 from gmb.viz import FantasyDashboard
 
 
+def apply_vermont_styling():
+    """Apply Vermont Green Mountains theme with custom CSS."""
+    st.markdown("""
+        <style>
+        /* Vermont Green Mountains Theme */
+
+        /* Main background with subtle texture */
+        .main {
+            background: linear-gradient(135deg, #F5F3EE 0%, #E8E5DC 100%);
+        }
+
+        /* Streamlit headers with mountain-inspired colors */
+        h1, h2, h3 {
+            color: #1A3329 !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            border-bottom: 3px solid #2D5F3F;
+            padding-bottom: 10px;
+        }
+
+        /* Metric cards with forest green accents */
+        [data-testid="stMetricValue"] {
+            color: #2D5F3F !important;
+            font-weight: 700;
+        }
+
+        [data-testid="stMetricLabel"] {
+            color: #4A7C59 !important;
+            font-weight: 600;
+        }
+
+        /* Tabs with autumn-inspired colors */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: #E8E5DC;
+            border-radius: 8px 8px 0 0;
+            padding: 5px;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            background-color: transparent;
+            border-radius: 5px;
+            padding: 10px 20px;
+            color: #4A7C59;
+            font-weight: 600;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, #2D5F3F 0%, #4A7C59 100%);
+            color: #F5F3EE !important;
+        }
+
+        /* Info boxes with mountain meadow colors */
+        .stAlert {
+            background-color: #D4E7DD !important;
+            border-left: 4px solid #2D5F3F !important;
+            color: #1A3329 !important;
+        }
+
+        /* Dataframes with subtle borders */
+        [data-testid="stDataFrame"] {
+            border: 2px solid #C5D5CC !important;
+            border-radius: 8px;
+        }
+
+        /* Buttons with forest green */
+        .stButton>button {
+            background: linear-gradient(135deg, #2D5F3F 0%, #4A7C59 100%);
+            color: #F5F3EE;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .stButton>button:hover {
+            background: linear-gradient(135deg, #1A3329 0%, #2D5F3F 100%);
+            box-shadow: 0 4px 12px rgba(45, 95, 63, 0.3);
+        }
+
+        /* Sidebar with darker forest theme */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #2D5F3F 0%, #1A3329 100%);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: #E8E5DC !important;
+        }
+
+        /* Charts and plots with subtle backgrounds */
+        [data-testid="stPlotlyChart"] {
+            background-color: #FAFAF8;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(26, 51, 41, 0.1);
+        }
+
+        /* Subheaders with accent color */
+        .stSubheader {
+            color: #4A7C59 !important;
+            border-bottom: 2px solid #C5D5CC;
+            padding-bottom: 5px;
+        }
+
+        /* Add subtle mountain silhouette to top */
+        .main::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: linear-gradient(to bottom, rgba(45, 95, 63, 0.05) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+
 def main():
     """Main entry point for the dashboard application."""
-    st.set_page_config(page_title="GMB Fantasy Football", layout="wide")
-    st.title("GMB Fantasy Football Dashboard")
+    st.set_page_config(
+        page_title="🏔️ Green Mountain Boys",
+        layout="wide",
+        page_icon="🏔️"
+    )
+
+    # Apply Vermont styling
+    apply_vermont_styling()
+
+    st.title("🏔️ Green Mountain Boys")
 
     try:
         # Load configuration from environment variables
@@ -84,23 +216,57 @@ def main():
                 oiwp_stats = calculate_oiwp_stats(dashboard.matchups_df)
 
                 if not oiwp_stats.empty:
-                    # Display OIWP table
+                    # Display OIWP table with color formatting
                     display_df = oiwp_stats.copy()
+
+                    # Format numeric columns first
                     display_df['wp'] = display_df['wp'].apply(lambda x: f"{x:.3f}")
                     display_df['oiwp'] = display_df['oiwp'].apply(lambda x: f"{x:.3f}")
                     display_df['luck'] = display_df['luck'].apply(lambda x: f"{x:+.3f}")
-                    display_df.columns = ['Team Name', 'Win %', 'OIWP', 'Luck']
-                    st.dataframe(display_df, use_container_width=True)
+                    display_df['schedule_wins'] = display_df['schedule_wins'].apply(lambda x: f"{x:+d}")
+
+                    # Rename columns
+                    display_df.columns = ['Team Name', 'Record', 'Predicted Record', 'Win %', 'OIWP', 'Luck', 'Schedule Wins']
+
+                    # Define color function for styled values
+                    def color_numeric_value(val):
+                        """Apply color based on positive/negative values."""
+                        try:
+                            # Extract numeric value from formatted string
+                            num_str = str(val).replace('+', '')
+                            num_val = float(num_str)
+
+                            if num_val > 0:
+                                return 'color: #28a745; font-weight: bold;'  # Standard green for positive
+                            elif num_val < 0:
+                                return 'color: #dc3545; font-weight: bold;'  # Standard red for negative
+                            else:
+                                return 'color: #6c757d;'  # Gray for neutral
+                        except (ValueError, AttributeError):
+                            return ''
+
+                    # Apply styling to Luck and Schedule Wins columns
+                    styled_df = display_df.style.map(
+                        color_numeric_value,
+                        subset=['Luck', 'Schedule Wins']
+                    )
+
+                    st.dataframe(styled_df, use_container_width=True)
 
                     # Explanation
                     st.info(
                         "**OIWP (Opponent-Independent Winning Percentage)** measures how well each team "
                         "would perform if they played against *every* other team in the league each week.\n\n"
+                        "- **Record**: Actual win-loss record from head-to-head matchups\n"
+                        "- **Predicted Record**: What your record would be based on OIWP\n"
                         "- **Win %**: Actual winning percentage from head-to-head matchups\n"
                         "- **OIWP**: Winning percentage against all teams (not just your opponent)\n"
                         "- **Luck**: Difference between Win % and OIWP\n"
                         "  - **Positive luck** (green): You're winning more than your scores suggest (favorable matchups)\n"
-                        "  - **Negative luck** (red): You're losing more than your scores suggest (tough matchups)"
+                        "  - **Negative luck** (red): You're losing more than your scores suggest (tough matchups)\n"
+                        "- **Schedule Wins**: Actual wins minus predicted wins\n"
+                        "  - **Positive** (+): Extra wins from favorable schedule\n"
+                        "  - **Negative** (-): Lost wins from tough schedule"
                     )
 
                     # Visualizations

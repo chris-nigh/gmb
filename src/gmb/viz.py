@@ -36,10 +36,14 @@ class FantasyDashboard:
             x="team_name",
             y="wins",
             title="League Standings",
+            color_discrete_sequence=["#2D5F3F"]  # Vermont forest green
         )
         fig.update_layout(
             xaxis_title="Team",
             yaxis_title="Wins",
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
         )
         st.plotly_chart(fig)
 
@@ -62,6 +66,16 @@ class FantasyDashboard:
             y="score",
             color="team_name",
             title="Weekly Scoring Trends",
+            color_discrete_sequence=[
+                "#2D5F3F", "#4A7C59", "#8B4513", "#D2691E",  # Forest greens and browns
+                "#6B8E23", "#556B2F", "#8FBC8F", "#2E8B57",  # Olive and sage
+                "#CD853F", "#DEB887", "#F4A460", "#DAA520"   # Autumn golds
+            ]
+        )
+        fig.update_layout(
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
         )
         st.plotly_chart(fig)
 
@@ -78,8 +92,14 @@ class FantasyDashboard:
             y="points_against",
             text="team_name",
             title="Points For vs Points Against",
+            color_discrete_sequence=["#4A7C59"]  # Mountain green
         )
-        fig.update_traces(textposition="top center")
+        fig.update_traces(textposition="top center", marker=dict(size=12, line=dict(width=2, color="#2D5F3F")))
+        fig.update_layout(
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+        )
         st.plotly_chart(fig)
 
     def generate_power_rankings(self) -> pd.DataFrame:
@@ -115,6 +135,7 @@ class FantasyDashboard:
                 "variable": "Metric"
             },
             barmode="group",
+            color_discrete_sequence=["#4A7C59", "#2D5F3F"]  # Mountain and forest greens
         )
         fig.update_layout(
             xaxis_tickangle=-45,
@@ -125,7 +146,10 @@ class FantasyDashboard:
                 y=1.02,
                 xanchor="right",
                 x=1
-            )
+            ),
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
         )
         # Rename legend labels
         fig.for_each_trace(lambda t: t.update(name="Win %" if t.name == "wp" else "OIWP"))
@@ -150,12 +174,19 @@ class FantasyDashboard:
                 "team_name": "Team"
             },
             color="luck",
-            color_continuous_scale=["red", "white", "green"],
+            color_continuous_scale=[
+                "#dc3545",  # Standard red (negative luck)
+                "#f8f9fa",  # Light gray (neutral)
+                "#28a745"   # Standard green (positive luck)
+            ],
             color_continuous_midpoint=0,
         )
         fig.update_layout(
             xaxis_tickangle=-45,
             showlegend=False,
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
         )
-        fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_hline(y=0, line_dash="dash", line_color="#6c757d", opacity=0.5)
         st.plotly_chart(fig, use_container_width=True)

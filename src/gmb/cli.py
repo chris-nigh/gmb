@@ -90,9 +90,13 @@ def oiwp():
         rprint("[dim]----------------------------------------------------[/dim]")
         for _, row in stats.iterrows():
             luck_color = "green" if row['luck'] > 0 else "red"
+            schedule_color = "green" if row['schedule_wins'] > 0 else "red" if row['schedule_wins'] < 0 else "dim"
             rprint(
-                f"{row['team_name']}: [bold]{row['oiwp']:.3f}[/bold] "
-                f"(Luck: [{luck_color}]{row['luck']:+.3f}[/{luck_color}])"
+                f"{row['team_name']}: [bold]{row['record']}[/bold] "
+                f"(Predicted: {row['predicted_record']}, "
+                f"OIWP: {row['oiwp']:.3f}, "
+                f"Luck: [{luck_color}]{row['luck']:+.3f}[/{luck_color}], "
+                f"Sched: [{schedule_color}]{row['schedule_wins']:+d}[/{schedule_color}])"
             )
     except Exception as e:
         rprint(f"[red]Error calculating OIWP: {e}[/red]")

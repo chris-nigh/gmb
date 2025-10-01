@@ -124,12 +124,15 @@ class TestOIWPCommand:
         mock_league.get_matchups.return_value = matchups_df
         mock_league_class.return_value = mock_league
 
-        # Mock OIWP stats
+        # Mock OIWP stats - now includes record, predicted_record, and schedule_wins fields
         stats_df = pd.DataFrame({
             'team_name': ['Team A', 'Team B'],
+            'record': ['1-0', '0-1'],
+            'predicted_record': ['1-0', '0-1'],
             'wp': [1.0, 0.0],
             'oiwp': [0.8, 0.2],
-            'luck': [0.2, -0.2]
+            'luck': [0.2, -0.2],
+            'schedule_wins': [0, 0]
         })
         mock_calc.return_value = stats_df
 
