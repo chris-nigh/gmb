@@ -537,7 +537,7 @@ class FantasyDashboard:
 
         # Calculate scoring consistency metrics per team
         consistency_stats = self.matchups_df.groupby('team_name').agg({
-            'team_points': ['mean', 'std', 'min', 'max']
+            'points': ['mean', 'std', 'min', 'max']
         }).reset_index()
 
         consistency_stats.columns = ['team_name', 'avg_points', 'std_dev', 'min_points', 'max_points']
