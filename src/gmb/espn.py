@@ -1,5 +1,7 @@
 """ESPN Fantasy Football API client module."""
-import pandas as pd  # type: ignore[import-untyped]
+from typing import Any
+
+import pandas as pd
 import requests
 
 # Request timeout in seconds
@@ -33,7 +35,7 @@ class ESPNFantasyLeague:
         if espn_s2 and swid:
             self.cookies = {"espn_s2": espn_s2, "SWID": swid}  # Note: SWID must be uppercase
 
-    def _extract_matchups(self, data: dict, week: int) -> list:
+    def _extract_matchups(self, data: dict[str, Any], week: int) -> list[dict[str, Any]]:
         """Extract matchup data from API response.
 
         Args:
@@ -95,7 +97,7 @@ class ESPNFantasyLeague:
 
         data = response.json()
 
-        teams_data: list[dict] = []
+        teams_data: list[dict[str, Any]] = []
         for team in data["teams"]:
             teams_data.append(
                 {
@@ -122,7 +124,8 @@ class ESPNFantasyLeague:
         response.raise_for_status()
 
         data = response.json()
-        return data.get('scoringPeriodId', 1)
+        scoring_period: int = data.get('scoringPeriodId', 1)
+        return scoring_period
 
     def get_matchups(self, week: int | None = None) -> pd.DataFrame:
         """Get matchup data for specific week or all weeks.

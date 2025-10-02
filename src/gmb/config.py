@@ -71,11 +71,12 @@ class DashboardConfig:
 
         try:
             with open(CONFIG_FILE) as f:
-                config = yaml.safe_load(f)
+                config: dict[str, Any] | None = yaml.safe_load(f)
                 if config:
                     config["league_id"] = int(config["league_id"])
                     config["year"] = int(config["year"])
-                return config
+                    return config
+                return None
         except (yaml.YAMLError, KeyError, ValueError):
             return None
 

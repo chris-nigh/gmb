@@ -1,6 +1,6 @@
 """OIWP (Opponent-Independent Winning Percentage) calculations."""
 import warnings
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 
 
 class TeamOIWP:
