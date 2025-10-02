@@ -530,47 +530,55 @@ class FantasyDashboard:
         st.plotly_chart(fig, use_container_width=True)
 
     def create_consistency_chart(self) -> None:
-        """Create scoring consistency visualization showing standard deviation of scores."""
-        if self.matchups_df is None or self.teams_df is None:
-            st.warning("Insufficient data for consistency analysis")
+        """Create boom/bust consistency analysis showing scoring variance."""
+        if self.matchups_df is None:
+            st.warning("Matchup data required for consistency analysis")
             return
 
-        # Calculate scoring consistency metrics per team
-        consistency_stats = self.matchups_df.groupby('team_name').agg({
-            'points': ['mean', 'std', 'min', 'max']
-        }).reset_index()
+        # Calculate standard deviation and mean for each team
+        consistency = (
+            self.matchups_df.groupby("team_name")["points"].agg(["mean", "std"]).reset_index()
+        )
+        consistency.columns = ["team_name", "avg_score", "std_dev"]
 
-        consistency_stats.columns = ['team_name', 'avg_points', 'std_dev', 'min_points', 'max_points']
+        # Calculate coefficient of variation (lower = more consistent)
+        consistency["cv"] = consistency["std_dev"] / consistency["avg_score"]
 
-        # Create scatter plot: avg points vs std dev
         fig = px.scatter(
-            consistency_stats,
-            x='avg_points',
-            y='std_dev',
-            text='team_name',
-            title='Scoring Consistency: Average vs Variability',
-            labels={'avg_points': 'Average Points Per Week', 'std_dev': 'Standard Deviation'},
-            color='std_dev',
-            color_continuous_scale=[[0, '#2D5F3F'], [1, '#DC143C']],
-            hover_data={'min_points': ':.1f', 'max_points': ':.1f'}
+            consistency,
+            x="avg_score",
+            y="std_dev",
+            text="team_name",
+            title="Scoring Consistency (Boom/Bust Analysis)",
+            labels={
+                "avg_score": "Average Score",
+                "std_dev": "Standard Deviation (Higher = More Volatile)",
+            },
+            color="cv",
+            color_continuous_scale="RdYlGn_r",  # Red = volatile, Green = consistent
+            size="std_dev",
         )
-
-        fig.update_traces(
-            textposition="top center",
-            marker=dict(size=12, line=dict(width=2, color="#1A3329"))
-        )
-
+        fig.update_traces(textposition="top center")
         fig.update_layout(
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
             font=dict(color="#1A3329"),
-            showlegend=False
         )
+
+        # Add quadrant lines
+        avg_mean = consistency["avg_score"].mean()
+        avg_std = consistency["std_dev"].mean()
+        fig.add_hline(y=avg_std, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_vline(x=avg_mean, line_dash="dash", line_color="gray", opacity=0.5)
+
         st.plotly_chart(fig, use_container_width=True)
 
+        # Add interpretation guide
         st.info(
-            "**Scoring Consistency**: Lower standard deviation indicates more predictable weekly scoring. "
-            "High consistency suggests balanced roster construction."
+            "**Top-Right**: High scoring but inconsistent (boom/bust)  \n"
+            "**Top-Left**: Low scoring and inconsistent (struggling)  \n"
+            "**Bottom-Right**: High scoring and consistent (elite)  \n"
+            "**Bottom-Left**: Low scoring but consistent (predictable but weak)"
         )
 
     def create_draft_value_analysis(self, draft_data: pd.DataFrame, player_stats: pd.DataFrame) -> None:

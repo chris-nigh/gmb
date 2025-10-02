@@ -240,7 +240,7 @@ def main():
                     display_df['schedule_wins'] = display_df['schedule_wins'].apply(lambda x: f"{x:+d}")
 
                     # Rename columns
-                    display_df.columns = ['Team Name', 'Record', 'Predicted Record', 'Win %', 'OIWP', 'Luck', 'Schedule Wins']
+                    display_df.columns = ['Team Name', 'Record', 'OIWP Predicted Record', 'Win %', 'OIWP', 'Luck', 'Schedule Wins']
 
                     # Define color function for styled values
                     def color_numeric_value(val):
