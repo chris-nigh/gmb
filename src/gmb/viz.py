@@ -529,6 +529,47 @@ class FantasyDashboard:
         )
         st.plotly_chart(fig, use_container_width=True)
 
+    def create_consistency_chart(self) -> None:
+        """Create scoring consistency visualization showing standard deviation of scores."""
+        if self.matchups_df is None or self.teams_df is None:
+            st.warning("Insufficient data for consistency analysis")
+            return
+
+        # Calculate scoring consistency metrics per team
+        consistency_stats = self.matchups_df.groupby('team_name').agg({
+            'team_points': ['mean', 'std', 'min', 'max']
+        }).reset_index()
+
+        consistency_stats.columns = ['team_name', 'avg_points', 'std_dev', 'min_points', 'max_points']
+
+        # Sort by standard deviation (lower = more consistent)
+        consistency_stats = consistency_stats.sort_values('std_dev')
+
+        fig = px.bar(
+            consistency_stats,
+            x='team_name',
+            y='std_dev',
+            title='Scoring Consistency (Lower = More Consistent)',
+            labels={'std_dev': 'Standard Deviation of Points', 'team_name': 'Team'},
+            color='std_dev',
+            color_continuous_scale=[[0, '#2D5F3F'], [1, '#DC143C']],
+            hover_data={'avg_points': ':.1f', 'min_points': ':.1f', 'max_points': ':.1f'}
+        )
+
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.info(
+            "**Scoring Consistency**: Lower standard deviation indicates more predictable weekly scoring. "
+            "High consistency suggests balanced roster construction."
+        )
+
     def create_draft_value_analysis(self, draft_data: pd.DataFrame, player_stats: pd.DataFrame) -> None:
         """Analyze best and worst draft picks based on cost vs performance.
 
