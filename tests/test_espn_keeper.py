@@ -1,7 +1,9 @@
 """Tests for ESPN Keeper League functionality."""
-import pytest
+
 from unittest.mock import Mock, patch
+
 import pandas as pd
+import pytest
 
 from gmb.espn_keeper import ESPNKeeperLeague
 
@@ -12,12 +14,7 @@ class TestESPNKeeperLeague:
     @pytest.fixture
     def league(self):
         """Create test league instance."""
-        return ESPNKeeperLeague(
-            league_id=123456,
-            year=2025,
-            espn_s2="test_s2",
-            swid="test_swid"
-        )
+        return ESPNKeeperLeague(league_id=123456, year=2025, espn_s2="test_s2", swid="test_swid")
 
     def test_init(self, league):
         """Test league initialization."""
@@ -26,7 +23,7 @@ class TestESPNKeeperLeague:
         assert league.cookies["espn_s2"] == "test_s2"
         assert league.cookies["SWID"] == "test_swid"
 
-    @patch('gmb.espn_keeper.requests.get')
+    @patch("gmb.espn_keeper.requests.get")
     def test_get_all_player_stats_success(self, mock_get, league):
         """Test getting all active player stats."""
         # Mock response
@@ -40,8 +37,12 @@ class TestESPNKeeperLeague:
                     "defaultPositionId": 0,
                     "stats": [
                         {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 250.5},
-                        {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 35.2}  # Current week
-                    ]
+                        {
+                            "statSourceId": 0,
+                            "statSplitTypeId": 0,
+                            "appliedTotal": 35.2,
+                        },  # Current week
+                    ],
                 }
             },
             {
@@ -51,10 +52,10 @@ class TestESPNKeeperLeague:
                     "defaultPositionId": 2,
                     "stats": [
                         {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 180.3},
-                        {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 28.5}
-                    ]
+                        {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 28.5},
+                    ],
                 }
-            }
+            },
         ]
         mock_get.return_value = mock_response
 
@@ -84,7 +85,7 @@ class TestESPNKeeperLeague:
         assert cmc["position_id"] == 2
         assert cmc["total_points"] == 28.5
 
-    @patch('gmb.espn_keeper.requests.get')
+    @patch("gmb.espn_keeper.requests.get")
     def test_get_all_player_stats_handles_empty_stats(self, mock_get, league):
         """Test handling players with no stats."""
         mock_response = Mock()
@@ -95,7 +96,7 @@ class TestESPNKeeperLeague:
                     "id": 1,
                     "fullName": "Rookie Player",
                     "defaultPositionId": 2,
-                    "stats": []  # No stats
+                    "stats": [],  # No stats
                 }
             }
         ]
@@ -106,7 +107,7 @@ class TestESPNKeeperLeague:
         assert len(result) == 1
         assert result.iloc[0]["total_points"] == 0
 
-    @patch('gmb.espn_keeper.requests.get')
+    @patch("gmb.espn_keeper.requests.get")
     def test_get_all_player_stats_api_error(self, mock_get, league):
         """Test error handling for failed API call."""
         mock_response = Mock()
@@ -116,7 +117,7 @@ class TestESPNKeeperLeague:
         with pytest.raises(ValueError, match="Failed to get player stats"):
             league.get_all_player_stats(2025)
 
-    @patch('gmb.espn_keeper.requests.get')
+    @patch("gmb.espn_keeper.requests.get")
     def test_get_player_stats_rostered_only(self, mock_get, league):
         """Test getting rostered player stats uses mRoster view."""
         mock_response = Mock()
@@ -135,13 +136,17 @@ class TestESPNKeeperLeague:
                                         "fullName": "Player One",
                                         "defaultPositionId": 0,
                                         "stats": [
-                                            {"statSourceId": 0, "statSplitTypeId": 0, "appliedTotal": 50.0}
-                                        ]
+                                            {
+                                                "statSourceId": 0,
+                                                "statSplitTypeId": 0,
+                                                "appliedTotal": 50.0,
+                                            }
+                                        ],
                                     }
                                 }
                             }
                         ]
-                    }
+                    },
                 }
             ]
         }

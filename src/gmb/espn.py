@@ -1,4 +1,5 @@
 """ESPN Fantasy Football API client module."""
+
 from typing import Any
 
 import pandas as pd
@@ -46,29 +47,33 @@ class ESPNFantasyLeague:
             List of matchup dictionaries
         """
         matchups = []
-        for game in data.get('schedule', []):
-            game_week = game.get('matchupPeriodId')
+        for game in data.get("schedule", []):
+            game_week = game.get("matchupPeriodId")
             if game_week != week:
                 continue
 
-            away_team = game.get('away', {})
-            home_team = game.get('home', {})
+            away_team = game.get("away", {})
+            home_team = game.get("home", {})
 
             if away_team and home_team:
-                matchups.append({
-                    'week': game_week,
-                    'team_name': away_team.get('teamId'),
-                    'points': away_team.get('totalPoints', 0),
-                    'opponent_name': home_team.get('teamId'),
-                    'opponent_points': home_team.get('totalPoints', 0)
-                })
-                matchups.append({
-                    'week': game_week,
-                    'team_name': home_team.get('teamId'),
-                    'points': home_team.get('totalPoints', 0),
-                    'opponent_name': away_team.get('teamId'),
-                    'opponent_points': away_team.get('totalPoints', 0)
-                })
+                matchups.append(
+                    {
+                        "week": game_week,
+                        "team_name": away_team.get("teamId"),
+                        "points": away_team.get("totalPoints", 0),
+                        "opponent_name": home_team.get("teamId"),
+                        "opponent_points": home_team.get("totalPoints", 0),
+                    }
+                )
+                matchups.append(
+                    {
+                        "week": game_week,
+                        "team_name": home_team.get("teamId"),
+                        "points": home_team.get("totalPoints", 0),
+                        "opponent_name": away_team.get("teamId"),
+                        "opponent_points": away_team.get("totalPoints", 0),
+                    }
+                )
         return matchups
 
     def get_teams(self) -> pd.DataFrame:
@@ -124,7 +129,7 @@ class ESPNFantasyLeague:
         response.raise_for_status()
 
         data = response.json()
-        scoring_period: int = data.get('scoringPeriodId', 1)
+        scoring_period: int = data.get("scoringPeriodId", 1)
         return scoring_period
 
     def get_matchups(self, week: int | None = None) -> pd.DataFrame:
@@ -144,7 +149,7 @@ class ESPNFantasyLeague:
 
         # Get team name mappings once
         teams = self.get_teams()
-        team_names = {team['team_id']: team['team_name'] for _, team in teams.iterrows()}
+        team_names = {team["team_id"]: team["team_name"] for _, team in teams.iterrows()}
 
         if week:
             if week > current_week:
@@ -166,14 +171,16 @@ class ESPNFantasyLeague:
             week_matchups = self._extract_matchups(data, w)
 
             # Only include weeks with actual scores (filter out future/unplayed weeks)
-            if week or any(m['points'] > 0 for m in week_matchups):
+            if week or any(m["points"] > 0 for m in week_matchups):
                 all_matchups.extend(week_matchups)
 
         if not all_matchups:
-            return pd.DataFrame(columns=['week', 'team_name', 'points', 'opponent_name', 'opponent_points'])
+            return pd.DataFrame(
+                columns=["week", "team_name", "points", "opponent_name", "opponent_points"]
+            )
 
         # Convert to DataFrame and map team IDs to names
         df = pd.DataFrame(all_matchups)
-        df['team_name'] = df['team_name'].map(team_names)
-        df['opponent_name'] = df['opponent_name'].map(team_names)
+        df["team_name"] = df["team_name"].map(team_names)
+        df["opponent_name"] = df["opponent_name"].map(team_names)
         return df

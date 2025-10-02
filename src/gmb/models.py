@@ -1,4 +1,5 @@
 """Data models for GMB fantasy football library."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,9 +60,7 @@ class Transaction:
     bid_amount: int | None = None
 
     @classmethod
-    def from_espn_data(
-        cls, data: dict[str, Any], teams_map: dict[int, str]
-    ) -> Transaction | None:
+    def from_espn_data(cls, data: dict[str, Any], teams_map: dict[int, str]) -> Transaction | None:
         """Create Transaction from ESPN API response data.
 
         Args:

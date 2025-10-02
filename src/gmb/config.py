@@ -1,8 +1,10 @@
 """Configuration management for GMB fantasy football dashboard."""
+
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
 import keyring
 import yaml
 

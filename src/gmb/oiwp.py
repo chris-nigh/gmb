@@ -1,5 +1,7 @@
 """OIWP (Opponent-Independent Winning Percentage) calculations."""
+
 import warnings
+
 import pandas as pd
 
 
@@ -98,51 +100,50 @@ def _validate_oiwp_results(results_df: pd.DataFrame) -> None:
         return
 
     # Check value ranges
-    for col in ['wp', 'oiwp']:
+    for col in ["wp", "oiwp"]:
         if (results_df[col] < 0.0).any() or (results_df[col] > 1.0).any():
             warnings.warn(
                 f"Invalid {col.upper()} values detected: should be between 0.0 and 1.0. "
                 f"Range: {results_df[col].min():.3f} to {results_df[col].max():.3f}",
                 UserWarning,
-                stacklevel=3
+                stacklevel=3,
             )
 
-    if (results_df['luck'] < -1.0).any() or (results_df['luck'] > 1.0).any():
+    if (results_df["luck"] < -1.0).any() or (results_df["luck"] > 1.0).any():
         warnings.warn(
             f"Invalid luck values detected: should be between -1.0 and 1.0. "
             f"Range: {results_df['luck'].min():.3f} to {results_df['luck'].max():.3f}",
             UserWarning,
-            stacklevel=3
+            stacklevel=3,
         )
 
     # Check zero-sum properties (allow 0.01 margin for rounding)
     margin = 0.01
 
-    mean_wp = results_df['wp'].mean()
+    mean_wp = results_df["wp"].mean()
     if abs(mean_wp - 0.500) > margin:
         warnings.warn(
-            f"Mean WP is {mean_wp:.3f}, expected ~0.500. "
-            f"This suggests data quality issues.",
+            f"Mean WP is {mean_wp:.3f}, expected ~0.500. This suggests data quality issues.",
             UserWarning,
-            stacklevel=3
+            stacklevel=3,
         )
 
-    mean_oiwp = results_df['oiwp'].mean()
+    mean_oiwp = results_df["oiwp"].mean()
     if abs(mean_oiwp - 0.500) > margin:
         warnings.warn(
             f"Mean OIWP is {mean_oiwp:.3f}, expected ~0.500. "
             f"This suggests calculation errors or data quality issues.",
             UserWarning,
-            stacklevel=3
+            stacklevel=3,
         )
 
-    sum_luck = results_df['luck'].sum()
+    sum_luck = results_df["luck"].sum()
     if abs(sum_luck) > margin * len(results_df):  # Scale margin by number of teams
         warnings.warn(
             f"Sum of luck values is {sum_luck:.3f}, expected ~0.0. "
             f"This suggests calculation errors (luck should be zero-sum).",
             UserWarning,
-            stacklevel=3
+            stacklevel=3,
         )
 
 
@@ -162,54 +163,59 @@ def calculate_oiwp_stats(matchups_df: pd.DataFrame) -> pd.DataFrame:
                                Sorted by OIWP descending
     """
     # Only consider weeks with actual scores
-    scored_weeks = matchups_df[matchups_df['points'] > 0]['week'].unique()
+    scored_weeks = matchups_df[matchups_df["points"] > 0]["week"].unique()
     if len(scored_weeks) == 0:
-        return pd.DataFrame(columns=['team_name', 'wp', 'oiwp', 'luck'])
+        return pd.DataFrame(columns=["team_name", "wp", "oiwp", "luck"])
 
     current_week = max(scored_weeks)
-    total_teams = len(matchups_df['team_name'].unique())
+    total_teams = len(matchups_df["team_name"].unique())
 
     team_dict: dict[str, TeamOIWP] = {}
 
     # Initialize teams
-    for team in matchups_df['team_name'].unique():
+    for team in matchups_df["team_name"].unique():
         team_dict[team] = TeamOIWP(team, current_week, total_teams)
 
     # Calculate actual wins and losses
     for _, row in matchups_df.iterrows():
-        if row['points'] > row['opponent_points']:
-            team_dict[row['team_name']].add_win()
-        elif row['points'] < row['opponent_points']:
-            team_dict[row['team_name']].add_loss()
+        if row["points"] > row["opponent_points"]:
+            team_dict[row["team_name"]].add_win()
+        elif row["points"] < row["opponent_points"]:
+            team_dict[row["team_name"]].add_loss()
 
     # Calculate OIWP - for each week, compare each team's score against every other team
     for week in range(1, current_week + 1):
         # Collect unique scores for each team this week
         week_scores = {}
-        for _, row in matchups_df[matchups_df['week'] == week].iterrows():
-            if row['team_name'] not in week_scores:
-                week_scores[row['team_name']] = row['points']
+        for _, row in matchups_df[matchups_df["week"] == week].iterrows():
+            if row["team_name"] not in week_scores:
+                week_scores[row["team_name"]] = row["points"]
 
         # Compare each team against all others
         for team_name, team_score in week_scores.items():
-            wins = sum(1 for other_name, other_score in week_scores.items()
-                     if other_name != team_name and team_score > other_score)
+            wins = sum(
+                1
+                for other_name, other_score in week_scores.items()
+                if other_name != team_name and team_score > other_score
+            )
             team_dict[team_name].add_oiwins(wins)
 
     # Create results dataframe
     results = []
     for team in team_dict.values():
-        results.append({
-            'team_name': team.name,
-            'record': team.record,
-            'predicted_record': team.predicted_record,
-            'wp': team.wp,
-            'oiwp': team.oiwp,
-            'luck': team.luck,
-            'schedule_wins': team.schedule_wins
-        })
+        results.append(
+            {
+                "team_name": team.name,
+                "record": team.record,
+                "predicted_record": team.predicted_record,
+                "wp": team.wp,
+                "oiwp": team.oiwp,
+                "luck": team.luck,
+                "schedule_wins": team.schedule_wins,
+            }
+        )
 
-    results_df = pd.DataFrame(results).sort_values('oiwp', ascending=False)
+    results_df = pd.DataFrame(results).sort_values("oiwp", ascending=False)
 
     # Validate output values
     _validate_oiwp_results(results_df)

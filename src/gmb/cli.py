@@ -1,8 +1,9 @@
 """Command-line interface for GMB configuration."""
+
 import typer
 from rich import print as rprint
 
-from gmb.config import DashboardConfig, CONFIG_FILE
+from gmb.config import CONFIG_FILE, DashboardConfig
 from gmb.espn import ESPNFantasyLeague
 
 app = typer.Typer(help="GMB Fantasy Football Tools")
@@ -52,10 +53,10 @@ def summary() -> None:
         teams_df = league.get_teams()
         rprint("\n[bold]Team Standings:[/bold]")
         rprint("[dim]--------------[/dim]")
-        standings = teams_df.sort_values('wins', ascending=False)[
-            ['team_name', 'wins', 'losses', 'points_for']
+        standings = teams_df.sort_values("wins", ascending=False)[
+            ["team_name", "wins", "losses", "points_for"]
         ]
-        standings['points_for'] = standings['points_for'].round(1)
+        standings["points_for"] = standings["points_for"].round(1)
         rprint(standings.to_string(index=False))
     except Exception as e:
         rprint(f"[red]Error displaying league summary: {e}[/red]")
@@ -80,6 +81,7 @@ def oiwp() -> None:
             return
 
         from .oiwp import calculate_oiwp_stats
+
         stats = calculate_oiwp_stats(matchups_df)
 
         if stats.empty:
@@ -89,8 +91,14 @@ def oiwp() -> None:
         rprint("\n[bold]Opponent-Independent Winning Percentage (OIWP) Analysis[/bold]")
         rprint("[dim]----------------------------------------------------[/dim]")
         for _, row in stats.iterrows():
-            luck_color = "green" if row['luck'] > 0 else "red"
-            schedule_color = "green" if row['schedule_wins'] > 0 else "red" if row['schedule_wins'] < 0 else "dim"
+            luck_color = "green" if row["luck"] > 0 else "red"
+            schedule_color = (
+                "green"
+                if row["schedule_wins"] > 0
+                else "red"
+                if row["schedule_wins"] < 0
+                else "dim"
+            )
             rprint(
                 f"{row['team_name']}: [bold]{row['record']}[/bold] "
                 f"(Predicted: {row['predicted_record']}, "
@@ -106,7 +114,9 @@ def oiwp() -> None:
 @app.command()
 def keepers(
     team_id: int = typer.Option(..., help="ESPN team ID to analyze"),
-    year: int = typer.Option(None, help="Year to generate keeper summary for (default: current config year)"),
+    year: int = typer.Option(
+        None, help="Year to generate keeper summary for (default: current config year)"
+    ),
     output: str = typer.Option(None, help="Output CSV file path (default: gmb_keepers_<year>.csv)"),
 ) -> None:
     """Generate keeper eligibility summary for a team.
@@ -131,7 +141,9 @@ def keepers(
             output = f"gmb_keepers_{year + 1}.csv"
 
         rprint(f"\n[bold]Generating Keeper Summary for {year + 1} Season[/bold]")
-        rprint(f"[dim]Analyzing {GO_BACK_YEARS} years of history ({year - GO_BACK_YEARS + 1}-{year})[/dim]\n")
+        rprint(
+            f"[dim]Analyzing {GO_BACK_YEARS} years of history ({year - GO_BACK_YEARS + 1}-{year})[/dim]\n"
+        )
 
         # Create keeper league client
         league = ESPNKeeperLeague(
@@ -161,8 +173,8 @@ def keepers(
 
         # Get team name
         teams_df = league.get_teams()
-        team_row = teams_df[teams_df['team_id'] == team_id]
-        team_name = team_row.iloc[0]['team_name'] if len(team_row) > 0 else f"Team {team_id}"
+        team_row = teams_df[teams_df["team_id"] == team_id]
+        team_name = team_row.iloc[0]["team_name"] if len(team_row) > 0 else f"Team {team_id}"
 
         # Analyze keeper eligibility
         analyzer = KeeperAnalyzer(draft_history, transaction_history)
@@ -175,20 +187,25 @@ def keepers(
         rprint(f"[dim]Total players analyzed: {len(results_df)}[/dim]")
 
         # Show summary
-        eligible_count = results_df['eligible'].sum()
+        eligible_count = results_df["eligible"].sum()
         rprint(f"[dim]Keeper eligible: {eligible_count}[/dim]")
 
     except Exception as e:
         rprint(f"[red]Error generating keeper summary: {e}[/red]")
         import traceback
+
         rprint(f"[dim]{traceback.format_exc()}[/dim]")
         raise typer.Exit(1)
 
 
 @app.command()
 def transactions(
-    year: int = typer.Option(None, help="Year to fetch transactions for (default: current config year)"),
-    output: str = typer.Option(None, help="Output CSV file path (default: transactions_<year>.csv)"),
+    year: int = typer.Option(
+        None, help="Year to fetch transactions for (default: current config year)"
+    ),
+    output: str = typer.Option(
+        None, help="Output CSV file path (default: transactions_<year>.csv)"
+    ),
 ) -> None:
     """Fetch and save league transactions to CSV.
 
@@ -225,7 +242,6 @@ def transactions(
         # Save to CSV
         trans_df.to_csv(output, index=False)
 
-
         rprint(f"\n[green]✓ Transactions saved to: {output}[/green]")
         rprint(f"[dim]Total transactions: {len(trans_df)}[/dim]")
 
@@ -237,12 +253,17 @@ def transactions(
 @app.command()
 def player_transactions(
     player_name: str = typer.Argument(..., help="Player name to filter (case-insensitive)"),
-    year: int = typer.Option(None, help="Year to fetch transactions for (default: current config year)"),
-    output: str = typer.Option(None, help="Output CSV file path (default: player_transactions_<year>.csv)"),
+    year: int = typer.Option(
+        None, help="Year to fetch transactions for (default: current config year)"
+    ),
+    output: str = typer.Option(
+        None, help="Output CSV file path (default: player_transactions_<year>.csv)"
+    ),
 ) -> None:
     """Export all transactions for a given player in a given year to CSV."""
     try:
         from .espn_keeper import ESPNKeeperLeague
+
         config = DashboardConfig.load()
         if year is None:
             year = config.year
@@ -257,7 +278,7 @@ def player_transactions(
         )
         trans_df = league.get_transactions(year)
         # Filter for player (case-insensitive substring match)
-        filtered = trans_df[trans_df['player_name'].str.lower().str.contains(player_name.lower())]
+        filtered = trans_df[trans_df["player_name"].str.lower().str.contains(player_name.lower())]
         filtered.to_csv(output, index=False)
         rprint(f"\n[green]✓ Player transactions saved to: {output}[/green]")
         rprint(f"[dim]Total transactions for '{player_name}': {len(filtered)}[/dim]")
@@ -269,11 +290,14 @@ def player_transactions(
 @app.command()
 def show_player_transactions(
     player_name: str = typer.Argument(..., help="Player name to filter (case-insensitive)"),
-    year: int = typer.Option(None, help="Year to fetch transactions for (default: current config year)"),
+    year: int = typer.Option(
+        None, help="Year to fetch transactions for (default: current config year)"
+    ),
 ) -> None:
     """Print all transactions for a given player in a given year to the screen, with a check for player existence."""
     try:
         from .espn_keeper import ESPNKeeperLeague
+
         config = DashboardConfig.load()
         if year is None:
             year = config.year
@@ -286,11 +310,13 @@ def show_player_transactions(
         )
         trans_df = league.get_transactions(year)
         # Check if player exists in any transaction
-        all_players = trans_df['player_name'].str.lower().unique()
+        all_players = trans_df["player_name"].str.lower().unique()
         if not any(player_name.lower() in p for p in all_players):
-            rprint(f"[red]No transactions found for any player matching '{player_name}' in {year}.[/red]")
+            rprint(
+                f"[red]No transactions found for any player matching '{player_name}' in {year}.[/red]"
+            )
             return
-        filtered = trans_df[trans_df['player_name'].str.lower().str.contains(player_name.lower())]
+        filtered = trans_df[trans_df["player_name"].str.lower().str.contains(player_name.lower())]
         if filtered.empty:
             rprint(f"[yellow]No transactions found for '{player_name}' in {year}.[/yellow]")
         else:
@@ -305,11 +331,14 @@ def show_player_transactions(
 @app.command()
 def show_player_draft(
     player_name: str = typer.Argument(..., help="Player name to filter (case-insensitive)"),
-    year: int = typer.Option(None, help="Year to fetch draft details for (default: current config year)"),
+    year: int = typer.Option(
+        None, help="Year to fetch draft details for (default: current config year)"
+    ),
 ) -> None:
     """Print draft details for a given player in a given year."""
     try:
         from .espn_keeper import ESPNKeeperLeague
+
         config = DashboardConfig.load()
         if year is None:
             year = config.year
@@ -323,20 +352,22 @@ def show_player_draft(
         draft_df = league.get_draft_picks(year)
 
         # Check if player exists in draft
-        all_players = draft_df['player_name'].str.lower().unique()
+        all_players = draft_df["player_name"].str.lower().unique()
         if not any(player_name.lower() in p for p in all_players):
-            rprint(f"[red]No draft pick found for any player matching '{player_name}' in {year}.[/red]")
+            rprint(
+                f"[red]No draft pick found for any player matching '{player_name}' in {year}.[/red]"
+            )
             return
 
         # Filter for player
-        filtered = draft_df[draft_df['player_name'].str.lower().str.contains(player_name.lower())]
+        filtered = draft_df[draft_df["player_name"].str.lower().str.contains(player_name.lower())]
 
         if filtered.empty:
             rprint(f"[yellow]No draft pick found for '{player_name}' in {year}.[/yellow]")
         else:
             rprint(f"\n[bold]Draft Details for '{player_name}' in {year}:[/bold]")
             for _, row in filtered.iterrows():
-                keeper_status = "[green]Yes[/green]" if row['keeper'] else "[dim]No[/dim]"
+                keeper_status = "[green]Yes[/green]" if row["keeper"] else "[dim]No[/dim]"
                 rprint(f"  Player: [cyan]{row['player_name']}[/cyan]")
                 rprint(f"  Team: {row['team_name']}")
                 rprint(f"  Round: {row['round']}, Pick: {row['pick']}")
@@ -399,29 +430,33 @@ def draft_value(
 
         # First, calculate position ranks from ALL rostered players (not just drafted)
         stats_with_position = stats_df.copy()
-        stats_with_position['position'] = stats_with_position['position_id'].apply(get_position_name)
+        stats_with_position["position"] = stats_with_position["position_id"].apply(
+            get_position_name
+        )
 
         # Calculate league-wide position rank
-        stats_with_rank = stats_with_position[stats_with_position['total_points'] > 0].copy()
-        stats_with_rank['pos_rank'] = stats_with_rank.groupby('position')['total_points'].rank(method='min', ascending=False)
+        stats_with_rank = stats_with_position[stats_with_position["total_points"] > 0].copy()
+        stats_with_rank["pos_rank"] = stats_with_rank.groupby("position")["total_points"].rank(
+            method="min", ascending=False
+        )
 
         # Now merge draft data with player stats AND position rank
         analysis = draft_df.merge(
-            stats_with_rank[['player_name', 'total_points', 'position_id', 'position', 'pos_rank']],
-            on='player_name',
-            how='left'
+            stats_with_rank[["player_name", "total_points", "position_id", "position", "pos_rank"]],
+            on="player_name",
+            how="left",
         )
 
-        rprint(f"[bold]After Merge:[/bold]")
+        rprint("[bold]After Merge:[/bold]")
         rprint(f"Total rows: {len(analysis)}")
         rprint(f"Players with stats: {analysis['total_points'].notna().sum()}")
         rprint(f"Players with points > 0: {(analysis['total_points'] > 0).sum()}\n")
 
         # Filter to players with stats and exclude D/ST
         analysis = analysis[
-            (analysis['total_points'].notna()) &
-            (analysis['total_points'] > 0) &
-            (analysis['position'] != 'D/ST')
+            (analysis["total_points"].notna())
+            & (analysis["total_points"] > 0)
+            & (analysis["position"] != "D/ST")
         ].copy()
 
         if analysis.empty:
@@ -429,14 +464,24 @@ def draft_value(
             return
 
         # Calculate value score
-        analysis['cost_normalized'] = (analysis['cost'] - analysis['cost'].min()) / (analysis['cost'].max() - analysis['cost'].min() + 1)
-        analysis['rank_normalized'] = (analysis['pos_rank'] - 1) / (analysis['pos_rank'].max())
-        analysis['value_score'] = (1 - analysis['rank_normalized']) - analysis['cost_normalized']
+        analysis["cost_normalized"] = (analysis["cost"] - analysis["cost"].min()) / (
+            analysis["cost"].max() - analysis["cost"].min() + 1
+        )
+        analysis["rank_normalized"] = (analysis["pos_rank"] - 1) / (analysis["pos_rank"].max())
+        analysis["value_score"] = (1 - analysis["rank_normalized"]) - analysis["cost_normalized"]
 
         # Best picks
         rprint("[bold green]🏆 Top 5 Best Draft Picks:[/bold green]")
-        best = analysis.nlargest(5, 'value_score')[
-            ['player_name', 'team_name', 'position', 'cost', 'total_points', 'pos_rank', 'value_score']
+        best = analysis.nlargest(5, "value_score")[
+            [
+                "player_name",
+                "team_name",
+                "position",
+                "cost",
+                "total_points",
+                "pos_rank",
+                "value_score",
+            ]
         ]
         for _, row in best.iterrows():
             rprint(
@@ -447,8 +492,16 @@ def draft_value(
             )
 
         rprint("\n[bold red]💸 Top 5 Worst Draft Picks:[/bold red]")
-        worst = analysis.nsmallest(5, 'value_score')[
-            ['player_name', 'team_name', 'position', 'cost', 'total_points', 'pos_rank', 'value_score']
+        worst = analysis.nsmallest(5, "value_score")[
+            [
+                "player_name",
+                "team_name",
+                "position",
+                "cost",
+                "total_points",
+                "pos_rank",
+                "value_score",
+            ]
         ]
         for _, row in worst.iterrows():
             rprint(
@@ -463,6 +516,7 @@ def draft_value(
     except Exception as e:
         rprint(f"[red]Error: {e}[/red]")
         import traceback
+
         rprint(f"[dim]{traceback.format_exc()}[/dim]")
         raise typer.Exit(1)
 

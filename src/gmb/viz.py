@@ -1,4 +1,5 @@
 """Visualization components for GMB fantasy football dashboard."""
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -39,11 +40,10 @@ class FantasyDashboard:
             text="team_name",
             title="League Standings: Wins vs Total Points",
             labels={"wins": "Wins", "points_for": "Total Points Scored"},
-            color_discrete_sequence=["#2D5F3F"]  # Vermont forest green
+            color_discrete_sequence=["#2D5F3F"],  # Vermont forest green
         )
         fig.update_traces(
-            textposition="top center",
-            marker=dict(size=12, line=dict(width=2, color="#1A3329"))
+            textposition="top center", marker=dict(size=12, line=dict(width=2, color="#1A3329"))
         )
         fig.update_layout(
             plot_bgcolor="#FAFAF8",
@@ -62,8 +62,8 @@ class FantasyDashboard:
         # Extract team scores by week
         # The matchups_df has columns: week, team_name, points, opponent_name, opponent_points
         # Each row represents one team's perspective of a matchup
-        scores_df = self.matchups_df[['week', 'team_name', 'points']].copy()
-        scores_df.rename(columns={'points': 'score'}, inplace=True)
+        scores_df = self.matchups_df[["week", "team_name", "points"]].copy()
+        scores_df.rename(columns={"points": "score"}, inplace=True)
 
         fig = px.line(
             scores_df,
@@ -72,11 +72,23 @@ class FantasyDashboard:
             color="team_name",
             title="Weekly Scoring Trends",
             color_discrete_sequence=[
-                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",  # Matplotlib default colors
-                "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",  # More muted tones
-                "#bcbd22", "#17becf", "#aec7e8", "#ffbb78",  # Pastel variants
-                "#98df8a", "#ff9896", "#c5b0d5", "#c49c94"   # Additional pastels
-            ]
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",  # Matplotlib default colors
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",  # More muted tones
+                "#bcbd22",
+                "#17becf",
+                "#aec7e8",
+                "#ffbb78",  # Pastel variants
+                "#98df8a",
+                "#ff9896",
+                "#c5b0d5",
+                "#c49c94",  # Additional pastels
+            ],
         )
         fig.update_layout(
             plot_bgcolor="#FAFAF8",
@@ -98,9 +110,11 @@ class FantasyDashboard:
             y="points_against",
             text="team_name",
             title="Points For vs Points Against",
-            color_discrete_sequence=["#4A7C59"]  # Mountain green
+            color_discrete_sequence=["#4A7C59"],  # Mountain green
         )
-        fig.update_traces(textposition="top center", marker=dict(size=12, line=dict(width=2, color="#2D5F3F")))
+        fig.update_traces(
+            textposition="top center", marker=dict(size=12, line=dict(width=2, color="#2D5F3F"))
+        )
         fig.update_layout(
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
@@ -135,24 +149,14 @@ class FantasyDashboard:
             x="team_name",
             y=["wp", "oiwp"],
             title="Win Percentage vs OIWP",
-            labels={
-                "value": "Percentage",
-                "team_name": "Team",
-                "variable": "Metric"
-            },
+            labels={"value": "Percentage", "team_name": "Team", "variable": "Metric"},
             barmode="group",
-            color_discrete_sequence=["#4A7C59", "#2D5F3F"]  # Mountain and forest greens
+            color_discrete_sequence=["#4A7C59", "#2D5F3F"],  # Mountain and forest greens
         )
         fig.update_layout(
             xaxis_tickangle=-45,
             legend_title_text="Metric",
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
             font=dict(color="#1A3329"),
@@ -175,15 +179,12 @@ class FantasyDashboard:
             x="team_name",
             y="luck",
             title="Team Luck Factor (Win % - OIWP)",
-            labels={
-                "luck": "Luck Factor",
-                "team_name": "Team"
-            },
+            labels={"luck": "Luck Factor", "team_name": "Team"},
             color="luck",
             color_continuous_scale=[
                 "#dc3545",  # Standard red (negative luck)
                 "#f8f9fa",  # Light gray (neutral)
-                "#28a745"   # Standard green (positive luck)
+                "#28a745",  # Standard green (positive luck)
             ],
             color_continuous_midpoint=0,
         )
@@ -197,7 +198,9 @@ class FantasyDashboard:
         fig.add_hline(y=0, line_dash="dash", line_color="#6c757d", opacity=0.5)
         st.plotly_chart(fig, use_container_width=True)
 
-    def create_keeper_summary_table(self, keeper_data: pd.DataFrame, team_filter: str | None = None) -> None:
+    def create_keeper_summary_table(
+        self, keeper_data: pd.DataFrame, team_filter: str | None = None
+    ) -> None:
         """Display keeper eligibility summary table.
 
         Args:
@@ -212,73 +215,110 @@ class FantasyDashboard:
 
         # Filter by team if specified
         if team_filter and team_filter != "All Teams":
-            display_df = display_df[display_df['team_name'] == team_filter]
+            display_df = display_df[display_df["team_name"] == team_filter]
 
         # Calculate position rank based on total points scored (higher points = higher rank)
         # Only rank among players with scoring data
-        if 'total_points' in display_df.columns:
+        if "total_points" in display_df.columns:
             # Debug: Show what we have
             # st.write("Debug - Position rank calculation:")
             # st.write(f"Total players: {len(display_df)}")
             # st.write(f"Players with points > 0: {(display_df['total_points'] > 0).sum()}")
 
             # Create a clean copy for ranking
-            rank_df = display_df[display_df['total_points'].notna() & (display_df['total_points'] > 0)].copy()
+            rank_df = display_df[
+                display_df["total_points"].notna() & (display_df["total_points"] > 0)
+            ].copy()
 
             if not rank_df.empty:
                 # Rank by total points within each position (descending - higher points = rank 1)
-                rank_df['pos_rank'] = rank_df.groupby('position')['total_points'].rank(method='min', ascending=False)
+                rank_df["pos_rank"] = rank_df.groupby("position")["total_points"].rank(
+                    method="min", ascending=False
+                )
 
                 # Merge ranks back to display_df
                 display_df = display_df.merge(
-                    rank_df[['player_name', 'pos_rank']],
-                    on='player_name',
-                    how='left',
-                    suffixes=('', '_new')
+                    rank_df[["player_name", "pos_rank"]],
+                    on="player_name",
+                    how="left",
+                    suffixes=("", "_new"),
                 )
                 # Use the new rank if it exists
-                if 'pos_rank_new' in display_df.columns:
-                    display_df['pos_rank'] = display_df['pos_rank_new']
-                    display_df = display_df.drop('pos_rank_new', axis=1)
+                if "pos_rank_new" in display_df.columns:
+                    display_df["pos_rank"] = display_df["pos_rank_new"]
+                    display_df = display_df.drop("pos_rank_new", axis=1)
         else:
             # Fallback: rank by keeper cost if no scoring data available
-            display_df['cost_numeric'] = pd.to_numeric(display_df['keeper_cost'], errors='coerce')
-            display_df['pos_rank'] = display_df.groupby('position')['cost_numeric'].rank(method='min', ascending=True)
+            display_df["cost_numeric"] = pd.to_numeric(display_df["keeper_cost"], errors="coerce")
+            display_df["pos_rank"] = display_df.groupby("position")["cost_numeric"].rank(
+                method="min", ascending=True
+            )
 
         # For ineligible players, clear the rank
-        display_df.loc[~display_df['eligible'], 'pos_rank'] = None
+        display_df.loc[~display_df["eligible"], "pos_rank"] = None
 
         # Create numeric cost for sorting (999 becomes large number for proper sorting)
-        display_df['cost_numeric'] = pd.to_numeric(display_df['keeper_cost'], errors='coerce')
-        display_df.loc[display_df['cost_numeric'] == 999, 'cost_numeric'] = float('inf')  # Sort ineligible to end
+        display_df["cost_numeric"] = pd.to_numeric(display_df["keeper_cost"], errors="coerce")
+        display_df.loc[display_df["cost_numeric"] == 999, "cost_numeric"] = float(
+            "inf"
+        )  # Sort ineligible to end
 
         # Format cost display (999 = ineligible, show as "-")
-        display_df['cost_display'] = display_df.apply(
-            lambda x: '-' if x['keeper_cost'] == 999 else f"${int(x['keeper_cost'])}",
-            axis=1
+        display_df["cost_display"] = display_df.apply(
+            lambda x: "-" if x["keeper_cost"] == 999 else f"${int(x['keeper_cost'])}", axis=1
         )
 
         # Format rank display
-        display_df['rank_display'] = display_df['pos_rank'].apply(
-            lambda x: f"{int(x)}" if pd.notna(x) else '-'
+        display_df["rank_display"] = display_df["pos_rank"].apply(
+            lambda x: f"{int(x)}" if pd.notna(x) else "-"
         )
 
         # Select and rename columns for display
-        cols_to_show = ['player_name', 'team_name', 'position', 'rank_display', 'eligible',
-                        'cost_numeric', 'cost_display', 'years_kept', 'years_remaining']
+        cols_to_show = [
+            "player_name",
+            "team_name",
+            "position",
+            "rank_display",
+            "eligible",
+            "cost_numeric",
+            "cost_display",
+            "years_kept",
+            "years_remaining",
+        ]
         display_df = display_df[cols_to_show]
 
-        display_df.columns = ['Player', 'Team', 'Position', 'Pos Rank', 'Eligible', 'Cost_Numeric', 'Cost', 'Years Kept', 'Years Left']
+        display_df.columns = [
+            "Player",
+            "Team",
+            "Position",
+            "Pos Rank",
+            "Eligible",
+            "Cost_Numeric",
+            "Cost",
+            "Years Kept",
+            "Years Left",
+        ]
 
         # Hide the numeric column but keep it for sorting
-        display_df = display_df[['Player', 'Team', 'Position', 'Pos Rank', 'Eligible', 'Cost', 'Years Kept', 'Years Left']]
+        display_df = display_df[
+            [
+                "Player",
+                "Team",
+                "Position",
+                "Pos Rank",
+                "Eligible",
+                "Cost",
+                "Years Kept",
+                "Years Left",
+            ]
+        ]
 
         # Format the display
         def highlight_eligible(row: pd.Series) -> list[str]:
-            if row['Eligible']:
-                return ['background-color: #D4E7DD'] * len(row)
+            if row["Eligible"]:
+                return ["background-color: #D4E7DD"] * len(row)
             else:
-                return ['background-color: #F5E6E6'] * len(row)
+                return ["background-color: #F5E6E6"] * len(row)
 
         styled_df = display_df.style.apply(highlight_eligible, axis=1)
         st.dataframe(styled_df, use_container_width=True, height=400)
@@ -293,33 +333,34 @@ class FantasyDashboard:
             return
 
         # Filter to eligible keepers only
-        eligible = keeper_data[keeper_data['eligible'] == True].copy()
+        eligible = keeper_data[keeper_data["eligible"]].copy()
 
         if eligible.empty:
             st.info("No eligible keepers found")
             return
 
         # Convert cost to numeric, replacing 'N/A' with 0
-        eligible['cost_numeric'] = pd.to_numeric(eligible['keeper_cost'], errors='coerce').fillna(0)
+        eligible["cost_numeric"] = pd.to_numeric(eligible["keeper_cost"], errors="coerce").fillna(0)
 
         # Group by team and sum costs
-        team_costs = eligible.groupby('team_name').agg({
-            'cost_numeric': 'sum',
-            'player_name': 'count'
-        }).reset_index()
-        team_costs.columns = ['Team', 'Total Cost', 'Eligible Players']
+        team_costs = (
+            eligible.groupby("team_name")
+            .agg({"cost_numeric": "sum", "player_name": "count"})
+            .reset_index()
+        )
+        team_costs.columns = ["Team", "Total Cost", "Eligible Players"]
 
         # Sort by total cost
-        team_costs = team_costs.sort_values('Total Cost', ascending=False)
+        team_costs = team_costs.sort_values("Total Cost", ascending=False)
 
         fig = px.bar(
             team_costs,
-            x='Team',
-            y='Total Cost',
-            title='Total Keeper Cost by Team',
-            color='Eligible Players',
-            color_continuous_scale=[[0, '#98df8a'], [1, '#2D5F3F']],  # Light to dark green
-            hover_data=['Eligible Players']
+            x="Team",
+            y="Total Cost",
+            title="Total Keeper Cost by Team",
+            color="Eligible Players",
+            color_continuous_scale=[[0, "#98df8a"], [1, "#2D5F3F"]],  # Light to dark green
+            hover_data=["Eligible Players"],
         )
         fig.update_layout(
             xaxis_tickangle=-45,
@@ -342,11 +383,11 @@ class FantasyDashboard:
         # Create box plot showing cost distribution per team
         fig = px.box(
             draft_data,
-            x='team_name',
-            y='cost',
-            title='Draft Cost Distribution by Team (Stars & Scrubs Analysis)',
-            labels={'cost': 'Player Cost ($)', 'team_name': 'Team'},
-            color_discrete_sequence=['#2D5F3F']
+            x="team_name",
+            y="cost",
+            title="Draft Cost Distribution by Team (Stars & Scrubs Analysis)",
+            labels={"cost": "Player Cost ($)", "team_name": "Team"},
+            color_discrete_sequence=["#2D5F3F"],
         )
         fig.update_layout(
             xaxis_tickangle=-45,
@@ -375,31 +416,39 @@ class FantasyDashboard:
 
         # Separate keepers from drafted players
         draft_data_copy = draft_data.copy()
-        draft_data_copy['player_type'] = draft_data_copy['keeper'].apply(lambda x: 'Keeper' if x else 'Drafted')
+        draft_data_copy["player_type"] = draft_data_copy["keeper"].apply(
+            lambda x: "Keeper" if x else "Drafted"
+        )
 
         # Calculate summary stats
-        summary = draft_data_copy.groupby(['team_name', 'player_type'])['cost'].agg(['mean', 'sum', 'count']).reset_index()
+        summary = (
+            draft_data_copy.groupby(["team_name", "player_type"])["cost"]
+            .agg(["mean", "sum", "count"])
+            .reset_index()
+        )
 
         # Create grouped bar chart showing keeper vs drafted costs
         fig = go.Figure()
 
-        for player_type in ['Keeper', 'Drafted']:
-            type_data = summary[summary['player_type'] == player_type]
+        for player_type in ["Keeper", "Drafted"]:
+            type_data = summary[summary["player_type"] == player_type]
             if not type_data.empty:
-                fig.add_trace(go.Bar(
-                    name=player_type,
-                    x=type_data['team_name'],
-                    y=type_data['sum'],
-                    text=type_data['count'].apply(lambda x: f"{int(x)} players"),
-                    textposition='auto',
-                    marker_color='#4A7C59' if player_type == 'Keeper' else '#8B4513'
-                ))
+                fig.add_trace(
+                    go.Bar(
+                        name=player_type,
+                        x=type_data["team_name"],
+                        y=type_data["sum"],
+                        text=type_data["count"].apply(lambda x: f"{int(x)} players"),
+                        textposition="auto",
+                        marker_color="#4A7C59" if player_type == "Keeper" else "#8B4513",
+                    )
+                )
 
         fig.update_layout(
-            title='Total Draft Cost: Keepers vs Drafted Players',
-            xaxis_title='Team',
-            yaxis_title='Total Cost ($)',
-            barmode='group',
+            title="Total Draft Cost: Keepers vs Drafted Players",
+            xaxis_title="Team",
+            yaxis_title="Total Cost ($)",
+            barmode="group",
             xaxis_tickangle=-45,
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
@@ -418,31 +467,38 @@ class FantasyDashboard:
             return
 
         # Calculate keeper stats per team
-        keepers_only = draft_data[draft_data['keeper'] == True]
+        keepers_only = draft_data[draft_data["keeper"]]
         if keepers_only.empty:
             st.info("No keepers selected in this draft")
             return
 
-        keeper_summary = keepers_only.groupby('team_name').agg({
-            'player_name': 'count',
-            'cost': ['sum', 'mean', 'max']
-        }).reset_index()
+        keeper_summary = (
+            keepers_only.groupby("team_name")
+            .agg({"player_name": "count", "cost": ["sum", "mean", "max"]})
+            .reset_index()
+        )
 
         # Flatten column names
-        keeper_summary.columns = ['Team', 'Keepers', 'Total Cost', 'Avg Cost', 'Max Cost']
+        keeper_summary.columns = ["Team", "Keepers", "Total Cost", "Avg Cost", "Max Cost"]
 
         # Add teams with no keepers
-        all_teams = pd.DataFrame({'Team': draft_data['team_name'].unique()})
-        keeper_summary = all_teams.merge(keeper_summary, on='Team', how='left').fillna(0)
+        all_teams = pd.DataFrame({"Team": draft_data["team_name"].unique()})
+        keeper_summary = all_teams.merge(keeper_summary, on="Team", how="left").fillna(0)
 
         # Format for display
-        keeper_summary['Total Cost'] = keeper_summary['Total Cost'].apply(lambda x: f"${int(x)}" if x > 0 else "-")
-        keeper_summary['Avg Cost'] = keeper_summary['Avg Cost'].apply(lambda x: f"${int(x)}" if x > 0 else "-")
-        keeper_summary['Max Cost'] = keeper_summary['Max Cost'].apply(lambda x: f"${int(x)}" if x > 0 else "-")
-        keeper_summary['Keepers'] = keeper_summary['Keepers'].astype(int)
+        keeper_summary["Total Cost"] = keeper_summary["Total Cost"].apply(
+            lambda x: f"${int(x)}" if x > 0 else "-"
+        )
+        keeper_summary["Avg Cost"] = keeper_summary["Avg Cost"].apply(
+            lambda x: f"${int(x)}" if x > 0 else "-"
+        )
+        keeper_summary["Max Cost"] = keeper_summary["Max Cost"].apply(
+            lambda x: f"${int(x)}" if x > 0 else "-"
+        )
+        keeper_summary["Keepers"] = keeper_summary["Keepers"].astype(int)
 
         # Sort by number of keepers
-        keeper_summary = keeper_summary.sort_values('Keepers', ascending=False)
+        keeper_summary = keeper_summary.sort_values("Keepers", ascending=False)
 
         st.dataframe(keeper_summary, use_container_width=True, hide_index=True)
 
@@ -456,29 +512,41 @@ class FantasyDashboard:
             return
 
         # Filter to eligible keepers only
-        eligible = keeper_data[keeper_data['eligible'] == True].copy()
+        eligible = keeper_data[keeper_data["eligible"]].copy()
 
         if eligible.empty:
             return
 
         # Convert cost to numeric
-        eligible['cost_numeric'] = pd.to_numeric(eligible['keeper_cost'], errors='coerce').fillna(0)
+        eligible["cost_numeric"] = pd.to_numeric(eligible["keeper_cost"], errors="coerce").fillna(0)
 
         fig = px.scatter(
             eligible,
-            x='cost_numeric',
-            y='years_remaining',
-            color='team_name',
-            size='cost_numeric',
-            hover_data=['player_name', 'position'],
-            title='Keeper Value Analysis',
-            labels={'cost_numeric': 'Keeper Cost ($)', 'years_remaining': 'Years Remaining'},
+            x="cost_numeric",
+            y="years_remaining",
+            color="team_name",
+            size="cost_numeric",
+            hover_data=["player_name", "position"],
+            title="Keeper Value Analysis",
+            labels={"cost_numeric": "Keeper Cost ($)", "years_remaining": "Years Remaining"},
             color_discrete_sequence=[
-                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",  # Matplotlib default colors
-                "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",  # More muted tones
-                "#bcbd22", "#17becf", "#aec7e8", "#ffbb78",  # Pastel variants
-                "#98df8a", "#ff9896", "#c5b0d5", "#c49c94"   # Additional pastels
-            ]
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",  # Matplotlib default colors
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",  # More muted tones
+                "#bcbd22",
+                "#17becf",
+                "#aec7e8",
+                "#ffbb78",  # Pastel variants
+                "#98df8a",
+                "#ff9896",
+                "#c5b0d5",
+                "#c49c94",  # Additional pastels
+            ],
         )
         fig.update_layout(
             plot_bgcolor="#FAFAF8",
@@ -494,31 +562,33 @@ class FantasyDashboard:
             return
 
         # Get opponent scores for each team (one row per matchup)
-        schedule_data = self.matchups_df[['team_name', 'opponent_points']].copy()
+        schedule_data = self.matchups_df[["team_name", "opponent_points"]].copy()
 
         # Calculate average opponent score per team
-        team_avg_opponents = schedule_data.groupby('team_name')['opponent_points'].mean().reset_index()
-        team_avg_opponents.columns = ['team_name', 'avg_opponent']
+        team_avg_opponents = (
+            schedule_data.groupby("team_name")["opponent_points"].mean().reset_index()
+        )
+        team_avg_opponents.columns = ["team_name", "avg_opponent"]
 
         fig = px.box(
             schedule_data,
-            x='team_name',
-            y='opponent_points',
-            title='Schedule Strength (Opponent Score Distribution)',
-            labels={'opponent_points': 'Opponent Score', 'team_name': 'Team'},
-            color_discrete_sequence=['#DC143C']  # Crimson color
+            x="team_name",
+            y="opponent_points",
+            title="Schedule Strength (Opponent Score Distribution)",
+            labels={"opponent_points": "Opponent Score", "team_name": "Team"},
+            color_discrete_sequence=["#DC143C"],  # Crimson color
         )
 
         # Add scatter points for team averages on top of box plot
         for _, row in team_avg_opponents.iterrows():
             fig.add_scatter(
-                x=[row['team_name']],
-                y=[row['avg_opponent']],
-                mode='markers',
-                marker=dict(size=10, color='#2D5F3F', symbol='diamond'),
-                name='Team Avg',
+                x=[row["team_name"]],
+                y=[row["avg_opponent"]],
+                mode="markers",
+                marker=dict(size=10, color="#2D5F3F", symbol="diamond"),
+                name="Team Avg",
                 showlegend=False,
-                hovertemplate=f"Avg: {row['avg_opponent']:.1f}<extra></extra>"
+                hovertemplate=f"Avg: {row['avg_opponent']:.1f}<extra></extra>",
             )
 
         fig.update_layout(
@@ -581,7 +651,9 @@ class FantasyDashboard:
             "**Bottom-Left**: Low scoring but consistent (predictable but weak)"
         )
 
-    def create_draft_value_analysis(self, draft_data: pd.DataFrame, player_stats: pd.DataFrame) -> None:
+    def create_draft_value_analysis(
+        self, draft_data: pd.DataFrame, player_stats: pd.DataFrame
+    ) -> None:
         """Analyze best and worst draft picks based on cost vs performance.
 
         Args:
@@ -606,17 +678,21 @@ class FantasyDashboard:
 
         # First, calculate position ranks from ALL rostered players (not just drafted)
         stats_with_position = player_stats.copy()
-        stats_with_position['position'] = stats_with_position['position_id'].apply(get_position_name)
+        stats_with_position["position"] = stats_with_position["position_id"].apply(
+            get_position_name
+        )
 
         # Calculate league-wide position rank
-        stats_with_rank = stats_with_position[stats_with_position['total_points'] > 0].copy()
-        stats_with_rank['pos_rank'] = stats_with_rank.groupby('position')['total_points'].rank(method='min', ascending=False)
+        stats_with_rank = stats_with_position[stats_with_position["total_points"] > 0].copy()
+        stats_with_rank["pos_rank"] = stats_with_rank.groupby("position")["total_points"].rank(
+            method="min", ascending=False
+        )
 
         # Now merge draft data with player stats AND position rank
         analysis = draft_data.merge(
-            stats_with_rank[['player_name', 'total_points', 'position_id', 'position', 'pos_rank']],
-            on='player_name',
-            how='left'
+            stats_with_rank[["player_name", "total_points", "position_id", "position", "pos_rank"]],
+            on="player_name",
+            how="left",
         )
 
         # st.write(f"After merge shape: {analysis.shape}")
@@ -624,42 +700,62 @@ class FantasyDashboard:
 
         # Filter to players with stats and exclude D/ST
         analysis = analysis[
-            (analysis['total_points'].notna()) &
-            (analysis['total_points'] > 0) &
-            (analysis['position'] != 'D/ST')
+            (analysis["total_points"].notna())
+            & (analysis["total_points"] > 0)
+            & (analysis["position"] != "D/ST")
         ].copy()
 
         if analysis.empty:
-            st.info("No scoring data available for draft value analysis. Players may not have played yet.")
+            st.info(
+                "No scoring data available for draft value analysis. Players may not have played yet."
+            )
             return
 
         # Calculate value score (lower rank number and lower cost = better value)
         # Normalize cost and rank to 0-1 scale
-        analysis['cost_normalized'] = (analysis['cost'] - analysis['cost'].min()) / (analysis['cost'].max() - analysis['cost'].min() + 1)
-        analysis['rank_normalized'] = (analysis['pos_rank'] - 1) / (analysis['pos_rank'].max())
+        analysis["cost_normalized"] = (analysis["cost"] - analysis["cost"].min()) / (
+            analysis["cost"].max() - analysis["cost"].min() + 1
+        )
+        analysis["rank_normalized"] = (analysis["pos_rank"] - 1) / (analysis["pos_rank"].max())
 
         # Value score: low rank (good) - high cost (bad)
         # Positive = good value (low rank, low cost), Negative = poor value (high rank, high cost)
-        analysis['value_score'] = (1 - analysis['rank_normalized']) - analysis['cost_normalized']
+        analysis["value_score"] = (1 - analysis["rank_normalized"]) - analysis["cost_normalized"]
 
         # Find best and worst picks
-        best_picks = analysis.nlargest(5, 'value_score')[
-            ['player_name', 'team_name', 'position', 'cost', 'total_points', 'pos_rank', 'value_score']
+        best_picks = analysis.nlargest(5, "value_score")[
+            [
+                "player_name",
+                "team_name",
+                "position",
+                "cost",
+                "total_points",
+                "pos_rank",
+                "value_score",
+            ]
         ].copy()
 
-        worst_picks = analysis.nsmallest(5, 'value_score')[
-            ['player_name', 'team_name', 'position', 'cost', 'total_points', 'pos_rank', 'value_score']
+        worst_picks = analysis.nsmallest(5, "value_score")[
+            [
+                "player_name",
+                "team_name",
+                "position",
+                "cost",
+                "total_points",
+                "pos_rank",
+                "value_score",
+            ]
         ].copy()
 
         # Format for display
         for df in [best_picks, worst_picks]:
-            df['cost'] = df['cost'].apply(lambda x: f"${int(x)}")
-            df['total_points'] = df['total_points'].apply(lambda x: f"{x:.1f}")
-            df['pos_rank'] = df['pos_rank'].apply(lambda x: f"{int(x)}")
-            df['value_score'] = df['value_score'].apply(lambda x: f"{x:+.3f}")
+            df["cost"] = df["cost"].apply(lambda x: f"${int(x)}")
+            df["total_points"] = df["total_points"].apply(lambda x: f"{x:.1f}")
+            df["pos_rank"] = df["pos_rank"].apply(lambda x: f"{int(x)}")
+            df["value_score"] = df["value_score"].apply(lambda x: f"{x:+.3f}")
 
-        best_picks.columns = ['Player', 'Team', 'Pos', 'Cost', 'Points', 'Rank', 'Value Score']
-        worst_picks.columns = ['Player', 'Team', 'Pos', 'Cost', 'Points', 'Rank', 'Value Score']
+        best_picks.columns = ["Player", "Team", "Pos", "Cost", "Points", "Rank", "Value Score"]
+        worst_picks.columns = ["Player", "Team", "Pos", "Cost", "Points", "Rank", "Value Score"]
 
         col1, col2 = st.columns(2)
 

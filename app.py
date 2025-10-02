@@ -1,6 +1,7 @@
 """GMB Fantasy Football Dashboard main script."""
-import streamlit as st
+
 import pandas as pd
+import streamlit as st
 
 from gmb.config import DashboardConfig
 from gmb.espn import ESPNFantasyLeague
@@ -13,7 +14,8 @@ from gmb.viz import FantasyDashboard
 
 def apply_vermont_styling():
     """Apply Vermont Green Mountains theme with custom CSS."""
-    st.markdown("""
+    st.markdown(
+        """
         <style>
         /* Vermont Green Mountains Theme */
 
@@ -132,16 +134,14 @@ def apply_vermont_styling():
             z-index: -1;
         }
         </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def main():
     """Main entry point for the dashboard application."""
-    st.set_page_config(
-        page_title="🏔️ Green Mountain Boys",
-        layout="wide",
-        page_icon="🏔️"
-    )
+    st.set_page_config(page_title="🏔️ Green Mountain Boys", layout="wide", page_icon="🏔️")
 
     # Apply Vermont styling
     apply_vermont_styling()
@@ -178,7 +178,15 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🎯 OIWP Analysis", "🔒 Keepers", "🎲 Keeper What-If", "📋 Draft Analysis"])
+        tab1, tab3, tab4, tab5, tab6 = st.tabs(
+            [
+                "📊 Overview",
+                "🎯 OIWP Analysis",
+                "🔒 Keepers",
+                "🎲 Keeper What-If",
+                "📋 Draft Analysis",
+            ]
+        )
 
         with tab1:
             # Standings section
@@ -234,36 +242,45 @@ def main():
                     display_df = oiwp_stats.copy()
 
                     # Format numeric columns first
-                    display_df['wp'] = display_df['wp'].apply(lambda x: f"{x:.3f}")
-                    display_df['oiwp'] = display_df['oiwp'].apply(lambda x: f"{x:.3f}")
-                    display_df['luck'] = display_df['luck'].apply(lambda x: f"{x:+.3f}")
-                    display_df['schedule_wins'] = display_df['schedule_wins'].apply(lambda x: f"{x:+d}")
+                    display_df["wp"] = display_df["wp"].apply(lambda x: f"{x:.3f}")
+                    display_df["oiwp"] = display_df["oiwp"].apply(lambda x: f"{x:.3f}")
+                    display_df["luck"] = display_df["luck"].apply(lambda x: f"{x:+.3f}")
+                    display_df["schedule_wins"] = display_df["schedule_wins"].apply(
+                        lambda x: f"{x:+d}"
+                    )
 
                     # Rename columns
-                    display_df.columns = ['Team Name', 'Record', 'OIWP Predicted Record', 'Win %', 'OIWP', 'Luck', 'Schedule Wins']
+                    display_df.columns = [
+                        "Team Name",
+                        "Record",
+                        "OIWP Predicted Record",
+                        "Win %",
+                        "OIWP",
+                        "Luck",
+                        "Schedule Wins",
+                    ]
 
                     # Define color function for styled values
                     def color_numeric_value(val):
                         """Apply color based on positive/negative values."""
                         try:
                             # Extract numeric value from formatted string
-                            num_str = str(val).replace('+', '')
+                            num_str = str(val).replace("+", "")
                             num_val = float(num_str)
 
                             if num_val > 0:
-                                return 'color: #28a745; font-weight: bold;'  # Standard green for positive
+                                return "color: #28a745; font-weight: bold;"  # Standard green for positive
                             elif num_val < 0:
-                                return 'color: #dc3545; font-weight: bold;'  # Standard red for negative
+                                return "color: #dc3545; font-weight: bold;"  # Standard red for negative
                             else:
-                                return 'color: #6c757d;'  # Gray for neutral
+                                return "color: #6c757d;"  # Gray for neutral
                         except (ValueError, AttributeError):
-                            return ''
+                            return ""
 
                     # Apply styling to Luck and Schedule Wins columns
                     styled_df = display_df.style.map(
-                        color_numeric_value,
-                        subset=['Luck', 'Schedule Wins']
-                    ).hide(axis='index')
+                        color_numeric_value, subset=["Luck", "Schedule Wins"]
+                    ).hide(axis="index")
 
                     st.dataframe(styled_df, use_container_width=True)
 
@@ -310,7 +327,7 @@ def main():
                     draft_history = []
                     transaction_history = []
 
-                    with st.spinner(f'Loading keeper data ({GO_BACK_YEARS} years of history)...'):
+                    with st.spinner(f"Loading keeper data ({GO_BACK_YEARS} years of history)..."):
                         for hist_year in range(year, year - GO_BACK_YEARS, -1):
                             draft_df = keeper_league.get_draft_picks(hist_year)
                             trans_df = keeper_league.get_transactions(hist_year)
@@ -322,27 +339,31 @@ def main():
                     analyzer = KeeperAnalyzer(draft_history, transaction_history)
 
                     # Get player stats for position ranking
-                    with st.spinner('Loading player statistics...'):
+                    with st.spinner("Loading player statistics..."):
                         player_stats = keeper_league.get_player_stats(year)
 
                     all_keeper_data = []
                     for _, team in teams_df.iterrows():
-                        team_id = team['team_id']
-                        team_name = team['team_name']
+                        team_id = team["team_id"]
+                        team_name = team["team_name"]
                         roster_df = keeper_league.get_roster(team_id, year)
                         team_keeper_data = analyzer.analyze_roster(roster_df, team_name)
                         all_keeper_data.append(team_keeper_data)
 
-                    keeper_df = pd.concat(all_keeper_data, ignore_index=True) if all_keeper_data else pd.DataFrame()
+                    keeper_df = (
+                        pd.concat(all_keeper_data, ignore_index=True)
+                        if all_keeper_data
+                        else pd.DataFrame()
+                    )
 
                     # Merge with player stats to get scoring data
                     if not keeper_df.empty and not player_stats.empty:
                         # Merge on player_name
                         keeper_df = keeper_df.merge(
-                            player_stats[['player_name', 'total_points', 'position_id']],
-                            on='player_name',
-                            how='left',
-                            suffixes=('', '_stats')
+                            player_stats[["player_name", "total_points", "position_id"]],
+                            on="player_name",
+                            how="left",
+                            suffixes=("", "_stats"),
                         )
 
                     return keeper_df
@@ -350,15 +371,18 @@ def main():
                 except Exception as e:
                     st.error(f"Error loading keeper data: {e}")
                     import traceback
+
                     st.error(traceback.format_exc())
                     return pd.DataFrame()
 
             # Load keeper data
-            keeper_data = load_keeper_data(config.league_id, config.year, config.espn_s2, config.swid)
+            keeper_data = load_keeper_data(
+                config.league_id, config.year, config.espn_s2, config.swid
+            )
 
             if not keeper_data.empty:
                 # Team filter
-                teams_list = ["All Teams"] + sorted(keeper_data['team_name'].unique().tolist())
+                teams_list = ["All Teams"] + sorted(keeper_data["team_name"].unique().tolist())
                 selected_team = st.selectbox("Filter by Team", teams_list)
 
                 # Display keeper summary table
@@ -368,81 +392,109 @@ def main():
                 # Summary metrics
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    total_eligible = keeper_data['eligible'].sum()
+                    total_eligible = keeper_data["eligible"].sum()
                     st.metric("Total Eligible Keepers", total_eligible)
                 with col2:
-                    avg_years = keeper_data[keeper_data['eligible']]['years_remaining'].mean()
-                    st.metric("Avg Years Remaining", f"{avg_years:.1f}" if not pd.isna(avg_years) else "N/A")
+                    avg_years = keeper_data[keeper_data["eligible"]]["years_remaining"].mean()
+                    st.metric(
+                        "Avg Years Remaining",
+                        f"{avg_years:.1f}" if not pd.isna(avg_years) else "N/A",
+                    )
                 with col3:
-                    eligible_with_cost = keeper_data[keeper_data['eligible']].copy()
-                    eligible_with_cost['cost_numeric'] = pd.to_numeric(eligible_with_cost['keeper_cost'], errors='coerce')
-                    avg_cost = eligible_with_cost['cost_numeric'].mean()
-                    st.metric("Avg Keeper Cost", f"${avg_cost:.0f}" if not pd.isna(avg_cost) else "N/A")
+                    eligible_with_cost = keeper_data[keeper_data["eligible"]].copy()
+                    eligible_with_cost["cost_numeric"] = pd.to_numeric(
+                        eligible_with_cost["keeper_cost"], errors="coerce"
+                    )
+                    avg_cost = eligible_with_cost["cost_numeric"].mean()
+                    st.metric(
+                        "Avg Keeper Cost", f"${avg_cost:.0f}" if not pd.isna(avg_cost) else "N/A"
+                    )
 
                 # Visualizations
                 st.subheader("Keeper Analytics")
                 dashboard.create_keeper_value_chart(keeper_data)
 
-                max_years = int(keeper_data['years_remaining'].max() + keeper_data['years_kept'].max())
+                max_years = int(
+                    keeper_data["years_remaining"].max() + keeper_data["years_kept"].max()
+                )
                 st.info(
                     f"**Keeper Rules**: Players can be kept for up to {max_years} years. "
                     "Cost increases by \\$5 in year 1, \\$10 in year 2, and \\$15 in year 3 from the original draft cost."
                 )
             else:
-                st.warning("No keeper data available. Make sure your league has keeper settings enabled.")
+                st.warning(
+                    "No keeper data available. Make sure your league has keeper settings enabled."
+                )
 
         with tab5:
             st.subheader("Keeper What-If Tool")
-            st.write("Experiment with different keeper combinations to see their impact on your draft budget and roster.")
+            st.write(
+                "Experiment with different keeper combinations to see their impact on your draft budget and roster."
+            )
 
             # Reuse the keeper data from tab4
-            keeper_data = load_keeper_data(config.league_id, config.year, config.espn_s2, config.swid)
+            keeper_data = load_keeper_data(
+                config.league_id, config.year, config.espn_s2, config.swid
+            )
 
             if not keeper_data.empty:
                 # Team selection
-                teams_list = sorted(keeper_data['team_name'].unique().tolist())
+                teams_list = sorted(keeper_data["team_name"].unique().tolist())
                 selected_team = st.selectbox("Select Your Team", teams_list, key="whatif_team")
 
                 # Filter to selected team's eligible keepers
                 team_keepers = keeper_data[
-                    (keeper_data['team_name'] == selected_team) &
-                    (keeper_data['eligible'] == True)
+                    (keeper_data["team_name"] == selected_team) & (keeper_data["eligible"])
                 ].copy()
 
                 if not team_keepers.empty:
                     # League settings (these would ideally come from ESPN API)
                     col1, col2 = st.columns(2)
                     with col1:
-                        auction_budget = st.number_input("Auction Budget", min_value=0, value=200, step=10)
+                        auction_budget = st.number_input(
+                            "Auction Budget", min_value=0, value=200, step=10
+                        )
                     with col2:
                         roster_size = st.number_input("Roster Size", min_value=1, value=15, step=1)
 
                     st.subheader("Select Your Keepers")
 
                     # Create multiselect for keeper selection
-                    team_keepers['display_name'] = team_keepers.apply(
+                    team_keepers["display_name"] = team_keepers.apply(
                         lambda x: f"{x['player_name']} ({x['position']}) - ${x['keeper_cost']}",
-                        axis=1
+                        axis=1,
                     )
 
                     selected_keepers = st.multiselect(
                         "Choose players to keep",
-                        team_keepers['display_name'].tolist(),
-                        help="Select as many keepers as you want"
+                        team_keepers["display_name"].tolist(),
+                        help="Select as many keepers as you want",
                     )
 
                     # Calculate impacts
                     if selected_keepers:
                         # Get costs for selected keepers
-                        selected_df = team_keepers[team_keepers['display_name'].isin(selected_keepers)].copy()
-                        selected_df['cost_numeric'] = pd.to_numeric(selected_df['keeper_cost'], errors='coerce').fillna(0)
-                        total_keeper_cost = selected_df['cost_numeric'].sum()
+                        selected_df = team_keepers[
+                            team_keepers["display_name"].isin(selected_keepers)
+                        ].copy()
+                        selected_df["cost_numeric"] = pd.to_numeric(
+                            selected_df["keeper_cost"], errors="coerce"
+                        ).fillna(0)
+                        total_keeper_cost = selected_df["cost_numeric"].sum()
                         remaining_budget = auction_budget - total_keeper_cost
                         roster_spots_to_fill = roster_size - len(selected_keepers)
-                        avg_per_player = remaining_budget / roster_spots_to_fill if roster_spots_to_fill > 0 else 0
+                        avg_per_player = (
+                            remaining_budget / roster_spots_to_fill
+                            if roster_spots_to_fill > 0
+                            else 0
+                        )
 
                         # Calculate max bid (need to leave $1 for each remaining spot)
-                        max_bid = remaining_budget - roster_spots_to_fill if roster_spots_to_fill > 0 else remaining_budget
+                        max_bid = (
+                            remaining_budget - roster_spots_to_fill
+                            if roster_spots_to_fill > 0
+                            else remaining_budget
+                        )
 
                         # Display impacts
                         st.subheader("Draft Impact")
@@ -455,17 +507,21 @@ def main():
                             st.metric("Remaining Budget", f"${remaining_budget:.0f}")
                         with col3:
                             st.metric("Avg $/Player", f"${avg_per_player:.2f}")
-                            st.metric("Maximum Single Bid", f"${max_bid:.0f}" if max_bid > 0 else "$0")
+                            st.metric(
+                                "Maximum Single Bid", f"${max_bid:.0f}" if max_bid > 0 else "$0"
+                            )
 
                         # Show selected keepers in roster format
                         st.subheader("Your Keeper Roster")
 
                         # Organize by position
-                        position_order = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST']
-                        selected_df['cost_display'] = selected_df['keeper_cost'].apply(lambda x: f"${int(x)}")
+                        position_order = ["QB", "RB", "WR", "TE", "K", "D/ST"]
+                        selected_df["cost_display"] = selected_df["keeper_cost"].apply(
+                            lambda x: f"${int(x)}"
+                        )
 
                         # Group by position
-                        grouped = selected_df.groupby('position')
+                        grouped = selected_df.groupby("position")
 
                         for pos in position_order:
                             if pos in grouped.groups:
@@ -479,11 +535,15 @@ def main():
                                     with col2:
                                         st.write(f"{player['cost_display']}")
                                     with col3:
-                                        years_left = int(player['years_remaining'])
-                                        st.write(f"{years_left} yr{'s' if years_left != 1 else ''} left")
+                                        years_left = int(player["years_remaining"])
+                                        st.write(
+                                            f"{years_left} yr{'s' if years_left != 1 else ''} left"
+                                        )
 
                         # Show any other positions not in the standard list
-                        other_positions = set(selected_df['position'].unique()) - set(position_order)
+                        other_positions = set(selected_df["position"].unique()) - set(
+                            position_order
+                        )
                         for pos in sorted(other_positions):
                             if pos in grouped.groups:
                                 pos_players = grouped.get_group(pos)
@@ -496,8 +556,10 @@ def main():
                                     with col2:
                                         st.write(f"${int(player['keeper_cost'])}")
                                     with col3:
-                                        years_left = int(player['years_remaining'])
-                                        st.write(f"{years_left} yr{'s' if years_left != 1 else ''} left")
+                                        years_left = int(player["years_remaining"])
+                                        st.write(
+                                            f"{years_left} yr{'s' if years_left != 1 else ''} left"
+                                        )
 
                         # Show summary of open roster spots by position
                         st.markdown("---")
@@ -505,13 +567,21 @@ def main():
 
                         # Draft strategy insight
                         if remaining_budget < roster_spots_to_fill:
-                            st.error("⚠️ Budget issue: You don't have enough money to fill remaining roster spots ($1 minimum per player)!")
+                            st.error(
+                                "⚠️ Budget issue: You don't have enough money to fill remaining roster spots ($1 minimum per player)!"
+                            )
                         elif avg_per_player < 5:
-                            st.warning("⚠️ Low budget: You'll have limited flexibility in the draft with less than $5 per remaining player.")
+                            st.warning(
+                                "⚠️ Low budget: You'll have limited flexibility in the draft with less than $5 per remaining player."
+                            )
                         elif avg_per_player > 15:
-                            st.success("✅ Good position: You have solid budget flexibility for the draft!")
+                            st.success(
+                                "✅ Good position: You have solid budget flexibility for the draft!"
+                            )
                         else:
-                            st.info("📊 Moderate budget: You'll need to balance stars and value picks.")
+                            st.info(
+                                "📊 Moderate budget: You'll need to balance stars and value picks."
+                            )
 
                     else:
                         st.info("Select players above to see draft impact analysis.")
@@ -544,7 +614,9 @@ def main():
 
             # Load player stats for best/worst picks analysis
             @st.cache_data(ttl=3600)
-            def load_player_stats_for_draft(league_id: int, year: int, espn_s2: str | None, swid: str | None):
+            def load_player_stats_for_draft(
+                league_id: int, year: int, espn_s2: str | None, swid: str | None
+            ):
                 try:
                     keeper_league = ESPNKeeperLeague(
                         league_id=league_id,
@@ -559,7 +631,9 @@ def main():
                     return pd.DataFrame()
 
             # Use same year as draft for stats (current season stats)
-            player_stats = load_player_stats_for_draft(config.league_id, config.year, config.espn_s2, config.swid)
+            player_stats = load_player_stats_for_draft(
+                config.league_id, config.year, config.espn_s2, config.swid
+            )
 
             if not draft_data.empty:
                 # Best/Worst draft picks analysis
@@ -582,14 +656,20 @@ def main():
                 # Additional metrics
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    total_keepers = draft_data['keeper'].sum()
+                    total_keepers = draft_data["keeper"].sum()
                     st.metric("Total Keepers", int(total_keepers))
                 with col2:
-                    avg_keeper_cost = draft_data[draft_data['keeper'] == True]['cost'].mean()
-                    st.metric("Avg Keeper Cost", f"${avg_keeper_cost:.1f}" if not pd.isna(avg_keeper_cost) else "N/A")
+                    avg_keeper_cost = draft_data[draft_data["keeper"]]["cost"].mean()
+                    st.metric(
+                        "Avg Keeper Cost",
+                        f"${avg_keeper_cost:.1f}" if not pd.isna(avg_keeper_cost) else "N/A",
+                    )
                 with col3:
-                    avg_draft_cost = draft_data[draft_data['keeper'] == False]['cost'].mean()
-                    st.metric("Avg Drafted Cost", f"${avg_draft_cost:.1f}" if not pd.isna(avg_draft_cost) else "N/A")
+                    avg_draft_cost = draft_data[~draft_data["keeper"]]["cost"].mean()
+                    st.metric(
+                        "Avg Drafted Cost",
+                        f"${avg_draft_cost:.1f}" if not pd.isna(avg_draft_cost) else "N/A",
+                    )
 
             else:
                 st.warning("No draft data available for analysis.")

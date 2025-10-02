@@ -1,4 +1,5 @@
 """Keeper player management with eligibility tracking."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -134,7 +135,9 @@ class KeeperAnalyzer:
             # Years kept + 1 (because we're calculating cost for NEXT year)
             next_year_num = years_kept + 1
             # Get increment for this year
-            increment = KEEPER_YEAR_INCREMENTS.get(next_year_num, KEEPER_YEAR_INCREMENTS[MAX_KEEP_YEARS])
+            increment = KEEPER_YEAR_INCREMENTS.get(
+                next_year_num, KEEPER_YEAR_INCREMENTS[MAX_KEEP_YEARS]
+            )
 
             # Add increment to original draft cost
             last_cost = draft_costs[0] if draft_costs[0] is not None else 0
