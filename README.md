@@ -211,16 +211,39 @@ All deployment methods support these environment variables:
 
 ### Testing
 
+Run tests with coverage:
 ```bash
 pytest
 ```
 
+See [TESTING.md](TESTING.md) for detailed testing information.
+
 ### Code Style
 
 This project uses:
-- Black for code formatting
-- isort for import sorting
-- mypy for type checking
+- **Ruff** for code formatting and linting (100-column width)
+- **Mypy** for type checking
+
+Format code:
+```bash
+ruff format .
+```
+
+Lint code:
+```bash
+ruff check .
+```
+
+See [FORMATTING.md](FORMATTING.md) for detailed formatting guidelines.
+
+### Continuous Integration
+
+GitHub Actions runs automated checks on every push:
+- Tests with coverage reporting
+- Ruff formatting and linting
+- Mypy type checking
+
+See [CI.md](CI.md) for CI/CD documentation.
 
 ## License
 
