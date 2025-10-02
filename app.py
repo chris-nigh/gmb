@@ -178,7 +178,7 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🏆 Power Rankings", "🎯 OIWP Analysis", "🔒 Keepers", "🎲 Keeper What-If", "📋 Draft Analysis"])
+        tab1, tab3, tab4, tab5, tab6 = st.tabs(["📊 Overview", "🎯 OIWP Analysis", "🔒 Keepers", "🎲 Keeper What-If", "📋 Draft Analysis"])
 
         with tab1:
             # Standings section
@@ -210,16 +210,17 @@ def main():
             else:
                 st.warning("Matchup data not available for analytics")
 
-        with tab2:
-            st.subheader("Power Rankings")
-            if dashboard.teams_df is not None:
-                rankings = dashboard.generate_power_rankings()
-                st.dataframe(rankings, use_container_width=True)
-
-                st.info(
-                    "Power rankings are calculated using a weighted formula: "
-                    "60% wins + 40% normalized points scored"
-                )
+        # Power Rankings tab (hidden for now, keeping code)
+        # with tab2:
+        #     st.subheader("Power Rankings")
+        #     if dashboard.teams_df is not None:
+        #         rankings = dashboard.generate_power_rankings()
+        #         st.dataframe(rankings, use_container_width=True)
+        #
+        #         st.info(
+        #             "Power rankings are calculated using a weighted formula: "
+        #             "60% wins + 40% normalized points scored"
+        #         )
 
         with tab3:
             st.subheader("Opponent-Independent Winning Percentage (OIWP)")
@@ -514,49 +515,6 @@ def main():
 
                     else:
                         st.info("Select players above to see draft impact analysis.")
-
-                    # Comparison table: All possible keeper scenarios
-                    with st.expander("📊 Compare All Keeper Scenarios"):
-                        st.write("See how different keeper selections would affect your draft:")
-
-                        scenarios = []
-                        team_keepers_sorted = team_keepers.sort_values('keeper_cost')
-
-                        # Generate scenarios (all combinations up to max_keepers)
-                        from itertools import combinations
-
-                        team_keepers_sorted['cost_numeric'] = pd.to_numeric(team_keepers_sorted['keeper_cost'], errors='coerce').fillna(0)
-
-                        # Limit scenarios to reasonable number (0-5 keepers)
-                        max_scenarios = min(len(team_keepers_sorted), 5)
-                        for num_keepers in range(0, max_scenarios + 1):
-                            if num_keepers == 0:
-                                scenarios.append({
-                                    'Scenario': 'No Keepers',
-                                    'Players': '-',
-                                    'Total Cost': 0,
-                                    'Remaining Budget': auction_budget,
-                                    'Avg $/Player': round(auction_budget / roster_size, 2)
-                                })
-                            else:
-                                # Show top scenario by cost for each number of keepers
-                                sorted_by_cost = team_keepers_sorted.nsmallest(num_keepers, 'cost_numeric')
-                                total_cost = int(sorted_by_cost['cost_numeric'].sum())
-                                players = ', '.join(sorted_by_cost['player_name'].tolist())
-                                scenarios.append({
-                                    'Scenario': f'{num_keepers} Keeper(s) (Cheapest)',
-                                    'Players': players,
-                                    'Total Cost': total_cost,
-                                    'Remaining Budget': auction_budget - total_cost,
-                                    'Avg $/Player': round((auction_budget - total_cost) / (roster_size - num_keepers), 2)
-                                })
-
-                        scenarios_df = pd.DataFrame(scenarios)
-                        # Format display columns
-                        scenarios_df['Total Cost'] = scenarios_df['Total Cost'].apply(lambda x: f'${x}' if x != 0 else '$0')
-                        scenarios_df['Remaining Budget'] = scenarios_df['Remaining Budget'].apply(lambda x: f'${x}')
-                        scenarios_df['Avg $/Player'] = scenarios_df['Avg $/Player'].apply(lambda x: f'${x:.2f}')
-                        st.dataframe(scenarios_df, use_container_width=True)
 
                 else:
                     st.info(f"No eligible keepers found for {selected_team}")

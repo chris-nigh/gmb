@@ -542,22 +542,25 @@ class FantasyDashboard:
 
         consistency_stats.columns = ['team_name', 'avg_points', 'std_dev', 'min_points', 'max_points']
 
-        # Sort by standard deviation (lower = more consistent)
-        consistency_stats = consistency_stats.sort_values('std_dev')
-
-        fig = px.bar(
+        # Create scatter plot: avg points vs std dev
+        fig = px.scatter(
             consistency_stats,
-            x='team_name',
+            x='avg_points',
             y='std_dev',
-            title='Scoring Consistency (Lower = More Consistent)',
-            labels={'std_dev': 'Standard Deviation of Points', 'team_name': 'Team'},
+            text='team_name',
+            title='Scoring Consistency: Average vs Variability',
+            labels={'avg_points': 'Average Points Per Week', 'std_dev': 'Standard Deviation'},
             color='std_dev',
             color_continuous_scale=[[0, '#2D5F3F'], [1, '#DC143C']],
-            hover_data={'avg_points': ':.1f', 'min_points': ':.1f', 'max_points': ':.1f'}
+            hover_data={'min_points': ':.1f', 'max_points': ':.1f'}
+        )
+
+        fig.update_traces(
+            textposition="top center",
+            marker=dict(size=12, line=dict(width=2, color="#1A3329"))
         )
 
         fig.update_layout(
-            xaxis_tickangle=-45,
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
             font=dict(color="#1A3329"),
@@ -611,8 +614,12 @@ class FantasyDashboard:
         # st.write(f"After merge shape: {analysis.shape}")
         # st.write(f"Players with points: {analysis['total_points'].notna().sum()}")
 
-        # Filter to players with stats
-        analysis = analysis[analysis['total_points'].notna() & (analysis['total_points'] > 0)].copy()
+        # Filter to players with stats and exclude D/ST
+        analysis = analysis[
+            (analysis['total_points'].notna()) &
+            (analysis['total_points'] > 0) &
+            (analysis['position'] != 'D/ST')
+        ].copy()
 
         if analysis.empty:
             st.info("No scoring data available for draft value analysis. Players may not have played yet.")

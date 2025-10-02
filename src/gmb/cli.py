@@ -417,8 +417,12 @@ def draft_value(
         rprint(f"Players with stats: {analysis['total_points'].notna().sum()}")
         rprint(f"Players with points > 0: {(analysis['total_points'] > 0).sum()}\n")
 
-        # Filter to players with stats
-        analysis = analysis[analysis['total_points'].notna() & (analysis['total_points'] > 0)].copy()
+        # Filter to players with stats and exclude D/ST
+        analysis = analysis[
+            (analysis['total_points'].notna()) &
+            (analysis['total_points'] > 0) &
+            (analysis['position'] != 'D/ST')
+        ].copy()
 
         if analysis.empty:
             rprint("[yellow]No players with scoring data found[/yellow]")
