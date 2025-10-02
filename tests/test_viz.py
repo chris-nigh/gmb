@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 import pandas as pd
 import streamlit as st
 
-from src.gmb.viz import FantasyDashboard
-from src.gmb.espn import ESPNFantasyLeague
+from gmb.viz import FantasyDashboard
+from gmb.espn import ESPNFantasyLeague
 
 
 class TestFantasyDashboard:
@@ -49,7 +49,7 @@ class TestFantasyDashboard:
         assert dashboard.teams_df is None
         assert dashboard.matchups_df is None
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_consistency_chart_with_data(self, mock_st, mock_league, sample_teams_df, sample_matchups_df):
         """Test consistency chart with valid data."""
         dashboard = FantasyDashboard(mock_league)
@@ -62,11 +62,11 @@ class TestFantasyDashboard:
         # Verify plotly chart was called
         mock_st.plotly_chart.assert_called_once()
 
-        # Verify info message was shown
+        # Verify info message was shown with quadrant explanations
         mock_st.info.assert_called_once()
-        assert "Scoring Consistency" in mock_st.info.call_args[0][0]
+        assert "boom/bust" in mock_st.info.call_args[0][0].lower()
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_consistency_chart_no_data(self, mock_st, mock_league):
         """Test consistency chart with no data shows warning."""
         dashboard = FantasyDashboard(mock_league)
@@ -78,12 +78,12 @@ class TestFantasyDashboard:
 
         # Verify warning was shown
         mock_st.warning.assert_called_once()
-        assert "Insufficient data" in mock_st.warning.call_args[0][0]
+        assert "Matchup data required" in mock_st.warning.call_args[0][0]
 
         # Verify plotly chart was NOT called
         mock_st.plotly_chart.assert_not_called()
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_consistency_chart_calculates_correctly(self, mock_st, mock_league, sample_teams_df, sample_matchups_df):
         """Test that consistency calculations are correct."""
         dashboard = FantasyDashboard(mock_league)
@@ -104,7 +104,7 @@ class TestFantasyDashboard:
         assert hasattr(fig, 'data')
         assert len(fig.data) > 0
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_consistency_chart_requires_correct_columns(self, mock_st, mock_league, sample_teams_df):
         """Test that consistency chart uses correct column names from matchups_df."""
         # Create matchups with wrong column name to verify it fails gracefully
@@ -124,7 +124,7 @@ class TestFantasyDashboard:
         with pytest.raises(KeyError, match="points"):
             dashboard.create_consistency_chart()
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_schedule_strength_chart_with_data(self, mock_st, mock_league, sample_teams_df, sample_matchups_df):
         """Test schedule strength chart with valid data."""
         dashboard = FantasyDashboard(mock_league)
@@ -137,7 +137,7 @@ class TestFantasyDashboard:
         # Verify plotly chart was called
         mock_st.plotly_chart.assert_called_once()
 
-    @patch('src.gmb.viz.st')
+    @patch('gmb.viz.st')
     def test_create_schedule_strength_chart_no_data(self, mock_st, mock_league):
         """Test schedule strength chart with no data shows warning."""
         dashboard = FantasyDashboard(mock_league)

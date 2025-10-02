@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import Mock, patch
 import pandas as pd
 
-from src.gmb.espn_keeper import ESPNKeeperLeague
+from gmb.espn_keeper import ESPNKeeperLeague
 
 
 class TestESPNKeeperLeague:
@@ -26,7 +26,7 @@ class TestESPNKeeperLeague:
         assert league.cookies["espn_s2"] == "test_s2"
         assert league.cookies["SWID"] == "test_swid"
 
-    @patch('src.gmb.espn_keeper.requests.get')
+    @patch('gmb.espn_keeper.requests.get')
     def test_get_all_player_stats_success(self, mock_get, league):
         """Test getting all active player stats."""
         # Mock response
@@ -84,7 +84,7 @@ class TestESPNKeeperLeague:
         assert cmc["position_id"] == 2
         assert cmc["total_points"] == 28.5
 
-    @patch('src.gmb.espn_keeper.requests.get')
+    @patch('gmb.espn_keeper.requests.get')
     def test_get_all_player_stats_handles_empty_stats(self, mock_get, league):
         """Test handling players with no stats."""
         mock_response = Mock()
@@ -106,7 +106,7 @@ class TestESPNKeeperLeague:
         assert len(result) == 1
         assert result.iloc[0]["total_points"] == 0
 
-    @patch('src.gmb.espn_keeper.requests.get')
+    @patch('gmb.espn_keeper.requests.get')
     def test_get_all_player_stats_api_error(self, mock_get, league):
         """Test error handling for failed API call."""
         mock_response = Mock()
@@ -116,7 +116,7 @@ class TestESPNKeeperLeague:
         with pytest.raises(ValueError, match="Failed to get player stats"):
             league.get_all_player_stats(2025)
 
-    @patch('src.gmb.espn_keeper.requests.get')
+    @patch('gmb.espn_keeper.requests.get')
     def test_get_player_stats_rostered_only(self, mock_get, league):
         """Test getting rostered player stats uses mRoster view."""
         mock_response = Mock()
