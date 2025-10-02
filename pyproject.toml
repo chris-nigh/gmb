@@ -49,9 +49,9 @@ Repository = "https://github.com/cnigh/gmb.git"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-# Note: Coverage requires pytest-cov to be installed
-# Install with: pip install -e ".[dev]"
-# addopts = "--cov=src/gmb --cov-report=html --cov-report=term-missing"
+# Note: Coverage requires pytest-cov to be installed (pip install -e ".[dev]")
+# For local testing without coverage, use: pytest --no-cov
+addopts = "--cov=src/gmb --cov-report=html --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["src/gmb"]

@@ -2,6 +2,17 @@
 
 This project uses pytest for testing and pytest-cov for code coverage analysis.
 
+## Continuous Integration
+
+Every push and pull request automatically runs:
+- ✅ All 66 tests across 6 test modules
+- ✅ Code coverage analysis
+- ✅ Ruff formatting checks
+- ✅ Ruff linting
+- ✅ Mypy type checking
+
+See `.github/workflows/ci.yml` for the full CI configuration.
+
 ## Running Tests
 
 ### Basic test run
