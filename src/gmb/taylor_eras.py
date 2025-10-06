@@ -159,9 +159,15 @@ def calculate_era_win_percentages(historical_matchups: list[dict[str, Any]]) -> 
     for game in historical_matchups:
         game_date = get_week_date(game["year"], game["week"])
         game["era"] = get_era_for_date(game_date)
-        game["win"] = 1 if game["points"] > game["opponent_points"] else 0
-        game["loss"] = 1 if game["points"] < game["opponent_points"] else 0
-
+        if game["points"] > game["opponent_points"]:
+            game["win"] = 1
+            game["loss"] = 0
+        elif game["points"] < game["opponent_points"]:
+            game["win"] = 0
+            game["loss"] = 1
+        else:
+            game["win"] = 0.5
+            game["loss"] = 0.5
     df = pd.DataFrame(historical_matchups)
 
     # Group by owner and era to calculate aggregated stats
