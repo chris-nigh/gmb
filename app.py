@@ -178,13 +178,14 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab3, tab4, tab5, tab6 = st.tabs(
+        tab1, tab3, tab4, tab5, tab6, tab7 = st.tabs(
             [
                 "📊 Overview",
                 "🎯 OIWP Analysis",
                 "🔒 Keepers",
                 "🎲 Keeper What-If",
                 "📋 Draft Analysis",
+                "✨ Taylor's Eras",
             ]
         )
 
@@ -673,6 +674,99 @@ def main():
 
             else:
                 st.warning("No draft data available for analysis.")
+
+        with tab7:
+            st.subheader("🎤 Winning Percentage by Taylor Swift Era")
+
+            st.info(
+                "Each Taylor Swift album release marks a new era. "
+                "This analysis shows how each owner performed during different Taylor Swift eras since 2006."
+            )
+
+            # Cache historical data loading
+            @st.cache_data(ttl=3600)
+            def load_historical_data(
+                league_id: int,
+                start_year: int,
+                end_year: int,
+                espn_s2: str | None,
+                swid: str | None,
+            ):
+                """Load historical matchup data for era analysis."""
+                from gmb.taylor_eras import get_historical_matchups_data
+
+                return get_historical_matchups_data(league_id, start_year, end_year, espn_s2, swid)
+
+            # Year range selection
+            col1, col2 = st.columns(2)
+            with col1:
+                start_year = st.number_input(
+                    "Start Year",
+                    min_value=2006,
+                    max_value=config.year,
+                    value=2006,
+                    step=1,
+                    help="Taylor Swift's debut album was released in 2006",
+                )
+            with col2:
+                end_year = st.number_input(
+                    "End Year",
+                    min_value=2006,
+                    max_value=config.year,
+                    value=config.year,
+                    step=1,
+                )
+
+            if start_year > end_year:
+                st.error("Start year must be before or equal to end year")
+            else:
+                with st.spinner(f"Loading {end_year - start_year + 1} years of historical data..."):
+                    historical_data = load_historical_data(
+                        config.league_id, start_year, end_year, config.espn_s2, config.swid
+                    )
+
+                if historical_data:
+                    from gmb.taylor_eras import calculate_era_win_percentages
+
+                    era_stats = calculate_era_win_percentages(historical_data)
+
+                    # Display the data table
+                    st.subheader("Era Statistics")
+
+                    # Format for display
+                    display_df = era_stats.copy()
+                    display_df["win_pct"] = display_df["win_pct"].apply(lambda x: f"{x:.1%}")
+                    display_df.columns = ["Owner", "Era", "Games", "Wins", "Losses", "Win %"]
+
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+                    # Visualizations
+                    dashboard.create_taylor_eras_chart(era_stats)
+
+                    # Fun facts
+                    st.subheader("🎵 Era Insights")
+
+                    # Most dominant owner-era combo
+                    best_owner_era = era_stats.loc[era_stats["win_pct"].idxmax()]
+
+                    st.metric(
+                        "Most Dominant Performance",
+                        f"{best_owner_era['owner']} in {best_owner_era['era']}",
+                        f"{best_owner_era['win_pct']:.1%}",
+                    )
+
+                    st.markdown(
+                        """
+                        ---
+                        **About the Eras**: Each era begins on the original album release date and ends when the next album is released.
+                        This analysis uses the original album releases only and does not include Taylor's Version re-recordings as separate eras.
+                        """
+                    )
+                else:
+                    st.warning(
+                        f"No historical data available for years {start_year}-{end_year}. "
+                        "This could be due to API access issues or the league not existing in those years."
+                    )
 
     except ValueError as e:
         st.error(f"Configuration Error: {e}")

@@ -774,3 +774,65 @@ class FantasyDashboard:
             "Positive scores indicate good value (high performance, low cost). "
             "Negative scores indicate poor value (low performance, high cost)."
         )
+
+    def create_taylor_eras_chart(self, era_stats: pd.DataFrame) -> None:
+        """Create Taylor Swift Eras winning percentage visualization.
+
+        Args:
+            era_stats: DataFrame with columns: owner, era, games, wins, losses, win_pct
+        """
+        if era_stats.empty:
+            st.warning("No era statistics available")
+            return
+
+        # Get chronological era order from taylor_eras module
+        from .taylor_eras import TAYLOR_ERAS
+
+        era_order = [era["era"] for era in TAYLOR_ERAS]
+        era_dates = {era["era"]: era["start_date"].strftime("%b %Y") for era in TAYLOR_ERAS}
+
+        # Create a pivot table for the heatmap
+        pivot_data = era_stats.pivot(index="owner", columns="era", values="win_pct")
+
+        # Sort columns chronologically
+        available_eras = [era for era in era_order if era in pivot_data.columns]
+        pivot_data = pivot_data[available_eras]
+
+        # Create x-axis labels with era name and date
+        x_labels = [f"{era}<br><sub>{era_dates[era]}</sub>" for era in pivot_data.columns]
+
+        # Create heatmap
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=pivot_data.values,
+                x=x_labels,
+                y=pivot_data.index,
+                colorscale=[
+                    [0, "#dc3545"],  # Red for low win%
+                    [0.5, "#ffc107"],  # Yellow for 50%
+                    [1, "#28a745"],  # Green for high win%
+                ],
+                text=pivot_data.values,
+                texttemplate="%{text:.1%}",
+                textfont={"size": 10},
+                colorbar=dict(
+                    title="Win %",
+                    tickformat=".0%",
+                ),
+                hovertemplate="<b>%{y}</b><br>Era: %{x}<br>Win %%: %{z:.1%}<extra></extra>",
+            )
+        )
+
+        fig.update_layout(
+            title="Winning Percentage by Taylor Swift Era",
+            xaxis_title="Taylor Swift Era (Release Date)",
+            yaxis_title="Owner",
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+            height=max(400, len(pivot_data.index) * 40),  # Dynamic height based on # of owners
+        )
+
+        fig.update_xaxes(tickangle=-45)
+
+        st.plotly_chart(fig, use_container_width=True)

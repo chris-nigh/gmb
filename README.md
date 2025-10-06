@@ -10,6 +10,7 @@ A dashboard for tracking ESPN fantasy football leagues with advanced statistics 
   - **Analytics**: Weekly scoring trends and points analysis
   - **Power Rankings**: Weighted team performance metrics
   - **OIWP Analysis**: Opponent-Independent Winning Percentage with luck factor
+  - **Taylor Eras**: Historical win percentage analysis by Taylor Swift album eras
 - **Command-Line Tools**:
   - `gmb setup`: Interactive configuration
   - `gmb summary`: Display league standings
@@ -63,7 +64,7 @@ Launch the interactive Streamlit dashboard:
 streamlit run app.py
 ```
 
-The dashboard includes four main tabs:
+The dashboard includes five main tabs:
 
 1. **📊 Overview**: League standings and summary metrics
 2. **📈 Analytics**: Weekly scoring trends and points comparisons
@@ -73,6 +74,10 @@ The dashboard includes four main tabs:
    - Shows how teams would perform against all opponents
    - Identifies "lucky" teams (winning despite lower scores)
    - Identifies "unlucky" teams (losing despite higher scores)
+5. **🎵 Taylor Eras**: Historical performance by Taylor Swift album release eras
+   - Win percentage heatmap across different eras
+   - Game-by-game era assignment based on actual dates
+   - Identifies most dominant owner-era combinations
 
 ### Command-Line Interface
 
