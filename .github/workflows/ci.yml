@@ -71,4 +71,4 @@ jobs:
 
     - name: Run mypy type checking
       run: |
-        mypy src/gmb --ignore-missing-imports
+        mypy src/gmb
