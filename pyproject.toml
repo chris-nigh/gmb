@@ -106,3 +106,7 @@ warn_return_any = true
 [[tool.mypy.overrides]]
 module = "typer.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "gmb.cli"
+disallow_untyped_decorators = false
