@@ -776,7 +776,7 @@ class FantasyDashboard:
         )
 
     def create_taylor_eras_chart(self, era_stats: pd.DataFrame) -> None:
-        """Create Taylor Swift Eras winning percentage visualization.
+        """Create interactive Taylor Swift Eras winning percentage visualization with hierarchical clustering.
 
         Args:
             era_stats: DataFrame with columns: owner, era, games, wins, losses, win_pct
@@ -784,6 +784,8 @@ class FantasyDashboard:
         if era_stats.empty:
             st.warning("No era statistics available")
             return
+
+        import dash_bio
 
         # Get chronological era order from taylor_eras module
         from .taylor_eras import TAYLOR_ERAS
@@ -798,41 +800,98 @@ class FantasyDashboard:
         available_eras = [era for era in era_order if era in pivot_data.columns]
         pivot_data = pivot_data[available_eras]
 
-        # Create x-axis labels with era name and date
-        x_labels = [f"{era}<br><sub>{era_dates[era]}</sub>" for era in pivot_data.columns]
+        # Create column labels with era name and date
+        col_labels = [f"{era}<br>({era_dates[era]})" for era in pivot_data.columns]
 
-        # Create heatmap
-        fig = go.Figure(
-            data=go.Heatmap(
-                z=pivot_data.values,
-                x=x_labels,
-                y=pivot_data.index,
-                colorscale=[
-                    [0, "#dc3545"],  # Red for low win%
-                    [0.5, "#ffc107"],  # Yellow for 50%
-                    [1, "#28a745"],  # Green for high win%
-                ],
-                text=pivot_data.values,
-                texttemplate="%{text:.1%}",
-                textfont={"size": 10},
-                colorbar=dict(
-                    title="Win %",
-                    tickformat=".0%",
-                ),
-                hovertemplate="<b>%{y}</b><br>Era: %{x}<br>Win %%: %{z:.1%}<extra></extra>",
-            )
+        # Fill NaN values with a special marker for clustering
+        # Use -0.5 so we can identify them (must be between -1 and 1 for normalization)
+        pivot_data_filled = pivot_data.fillna(-0.0001)  # Slightly below 0 to distinguish from 0%
+
+        # Create clustergram with proper formatting
+        fig = dash_bio.Clustergram(
+            data=pivot_data_filled.values,
+            row_labels=list(pivot_data_filled.index),
+            column_labels=col_labels,
+            cluster="row",  # Only cluster rows (owners)
+            standardize="none",  # Don't apply z-score normalization
+            center_values=False,
+            color_map=[
+                [0, "#dc3545"],  # Red for low win%
+                [0.5, "#ffc107"],  # Yellow for 50%
+                [1, "#28a745"],  # Green for high win%
+            ],
+            height=max(600, len(pivot_data.index) * 50),
+            width=max(900, len(pivot_data.columns) * 90),
+            display_ratio=0.15,  # dendrogram ratio
+            color_threshold={"row": 0},
+            line_width=2,
         )
 
+        # Add percentage text annotations to the heatmap
+        for trace in fig.data:
+            if isinstance(trace, go.Heatmap):
+                # The trace.z already contains the clustered data
+                # We just need to convert the values to percentage strings
+                # The issue is that trace.z may have standardized values, so we need
+                # to use the original data in the correct clustered order
+
+                # Since center_values=False and standardize="none", trace.z should contain
+                # the original percentage values (with 0.5 for NaN)
+                # We need to convert back: if value is 0.5 and was originally NaN, show "-"
+
+                text_annotations = []
+                for row_vals in trace.z:
+                    row_text = []
+                    for val in row_vals:
+                        # Check if this is a NaN marker (-1)
+                        if val < 0:
+                            row_text.append("-")
+                        else:
+                            row_text.append(f"{val:.1%}")
+                    text_annotations.append(row_text)
+
+                # Create a custom colorscale that includes gray for NaN
+                # Map: -0.5 (NaN) → gray, 0 (0%) → red, 0.5 (50%) → yellow, 1.0 (100%) → green
+                custom_colorscale = [
+                    [0, "#e0e0e0"],  # Gray for -0.5 (NaN) - normalized to 0
+                    [0.0001, "#e0e0e0"],  # Keep gray until just before 0%
+                    [0.0002, "#dc3545"],  # Red for 0% win
+                    [0.1, "#dc3545"],  # Red for 10% win
+                    [0.5, "#ffc107"],  # Yellow for 50% win
+                    [0.9, "#28a745"],  # Green for 90% win
+                    [1, "#28a745"],  # Green for 100% win
+                ]
+
+                # Update the trace with text annotations and custom colorscale
+                # Use zmin=-0.5 to include NaN values, but colorbar only shows 0-100%
+                trace.update(
+                    text=text_annotations,
+                    texttemplate="%{text}",
+                    textfont={"size": 10, "color": "white"},
+                    colorscale=custom_colorscale,
+                    zmin=-0.0001,  # Include NaN marker in color scale
+                    zmax=1.0,
+                    colorbar=dict(
+                        title="Win %",
+                        tickformat=".1%",
+                        tickvals=[0, 0.25, 0.5, 0.75, 1.0],
+                        ticktext=["0.0%", "25.0%", "50.0%", "75.0%", "100.0%"],
+                        tick0=0,
+                        dtick=0.25,
+                    ),
+                )
+
+        # Update layout
         fig.update_layout(
-            title="Winning Percentage by Taylor Swift Era",
-            xaxis_title="Taylor Swift Era (Release Date)",
-            yaxis_title="Owner",
+            title={
+                "text": "Winning Percentage by Taylor Swift Era (Hierarchically Clustered)",
+                "x": 0.5,
+                "xanchor": "center",
+            },
+            xaxis={"tickangle": -45},
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
             font=dict(color="#1A3329"),
-            height=max(400, len(pivot_data.index) * 40),  # Dynamic height based on # of owners
         )
-
-        fig.update_xaxes(tickangle=-45)
 
         st.plotly_chart(fig, use_container_width=True)
