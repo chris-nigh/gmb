@@ -805,7 +805,7 @@ class FantasyDashboard:
 
         # Fill NaN values with a special marker for clustering
         # Use -0.5 so we can identify them (must be between -1 and 1 for normalization)
-        pivot_data_filled = pivot_data.fillna(-0.0001) # Slightly below 0 to distinguish from 0%
+        pivot_data_filled = pivot_data.fillna(-0.0001)  # Slightly below 0 to distinguish from 0%
 
         # Create clustergram with proper formatting
         fig = dash_bio.Clustergram(
@@ -853,13 +853,13 @@ class FantasyDashboard:
                 # Create a custom colorscale that includes gray for NaN
                 # Map: -0.5 (NaN) → gray, 0 (0%) → red, 0.5 (50%) → yellow, 1.0 (100%) → green
                 custom_colorscale = [
-                    [0, "#e0e0e0"],      # Gray for -0.5 (NaN) - normalized to 0
+                    [0, "#e0e0e0"],  # Gray for -0.5 (NaN) - normalized to 0
                     [0.0001, "#e0e0e0"],  # Keep gray until just before 0%
                     [0.0002, "#dc3545"],  # Red for 0% win
                     [0.1, "#dc3545"],  # Red for 10% win
                     [0.5, "#ffc107"],  # Yellow for 50% win
-                    [0.9, "#28a745"],      # Green for 90% win
-                    [1, "#28a745"],      # Green for 100% win
+                    [0.9, "#28a745"],  # Green for 90% win
+                    [1, "#28a745"],  # Green for 100% win
                 ]
 
                 # Update the trace with text annotations and custom colorscale
