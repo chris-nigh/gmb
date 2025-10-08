@@ -170,7 +170,14 @@ def main():
             with col1:
                 st.metric("Total Teams", len(dashboard.teams_df))
             with col2:
-                st.metric("Avg Points/Game", f"{dashboard.teams_df['points_for'].mean():.1f}")
+                # Calculate avg points per game across all teams
+                dashboard.teams_df["games_played"] = (
+                    dashboard.teams_df["wins"] + dashboard.teams_df["losses"]
+                )
+                avg_ppg = (
+                    dashboard.teams_df["points_for"] / dashboard.teams_df["games_played"]
+                ).mean()
+                st.metric("Avg Points/Game", f"{avg_ppg:.1f}")
             with col3:
                 highest_scorer = dashboard.teams_df.loc[
                     dashboard.teams_df["points_for"].idxmax(), "team_name"
