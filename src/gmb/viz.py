@@ -1184,7 +1184,43 @@ class FantasyDashboard:
         Args:
             historical_matchups: Optional historical matchup data. If None, uses current season.
         """
+        if historical_matchups is not None:
+            matchups = historical_matchups.copy()
+        else:
+            if self.matchups_df is None:
+                self.load_data()
+            if self.matchups_df is None:
+                raise ValueError("Failed to load matchup data")
+            matchups = self.matchups_df.copy()
+
         h2h_matrix = self.compute_h2h_matrix_by_owner(historical_matchups)
+
+        # Build record matrix (wins-losses) for hover text
+        owners = sorted(list(matchups["owner"].unique()))
+        wins_dict: dict[tuple[str, str], int] = {(o1, o2): 0 for o1 in owners for o2 in owners}
+        losses_dict: dict[tuple[str, str], int] = {(o1, o2): 0 for o1 in owners for o2 in owners}
+
+        for _, row in matchups.iterrows():
+            owner = str(row["owner"])
+            opponent_owner = str(row["opponent_owner"])
+            owner_score = float(row["points"])
+            opponent_score = float(row["opponent_points"])
+
+            if owner in owners and opponent_owner in owners:
+                if owner_score > opponent_score:
+                    wins_dict[(owner, opponent_owner)] += 1
+                else:
+                    losses_dict[(owner, opponent_owner)] += 1
+
+        record_matrix = pd.DataFrame(None, index=owners, columns=owners)
+        for owner in owners:
+            for opponent_owner in owners:
+                if owner == opponent_owner:
+                    record_matrix.loc[owner, opponent_owner] = ""
+                else:
+                    w = wins_dict[(owner, opponent_owner)]
+                    losses = losses_dict[(owner, opponent_owner)]
+                    record_matrix.loc[owner, opponent_owner] = f"{w}-{losses}"
 
         # Create heatmap
         fig = go.Figure(
@@ -1202,11 +1238,12 @@ class FantasyDashboard:
                 text=h2h_matrix.values,
                 texttemplate="%{text:.1%}",
                 textfont={"size": 11, "color": "white"},
+                customdata=record_matrix.values,
                 colorbar=dict(
                     title="Win %",
                     tickformat=".0%",
                 ),
-                hovertemplate="<b>%{y} vs %{x}</b><br>Win %: %{text:.1%}<extra></extra>",
+                hovertemplate="<b>%{y} vs %{x}</b><br>Win %: %{text:.1%}<br>Record: %{customdata}<extra></extra>",
             )
         )
 
@@ -1277,6 +1314,8 @@ class FantasyDashboard:
                 if len(opponent_matchups) > 0:
                     # Create a year-week label for each point
                     opponent_matchups["label"] = opponent_matchups["year"].astype(str) + "-W" + opponent_matchups["week"].astype(str)
+                    # Create record string (wins-losses)
+                    opponent_matchups["record"] = opponent_matchups["cum_wins"].astype(str) + "-" + opponent_matchups["cum_losses"].astype(str)
 
                     fig.add_trace(
                         go.Scatter(
@@ -1288,8 +1327,8 @@ class FantasyDashboard:
                             marker=dict(size=6),
                             hovertemplate="<b>"
                             + opponent
-                            + "</b><br>Season: %{x}<br>Game: %{customdata[0]}<br>Cumulative Win %: %{y:.1%}<extra></extra>",
-                            customdata=opponent_matchups[["label"]],
+                            + "</b><br>Season: %{x}<br>Record: %{customdata[0]}<br>Cumulative Win %: %{y:.1%}<extra></extra>",
+                            customdata=opponent_matchups[["record"]],
                         )
                     )
 
@@ -1313,7 +1352,7 @@ class FantasyDashboard:
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
             font=dict(color="#1A3329"),
-            hovermode="x unified",
+            hovermode="closest",
             legend=dict(
                 orientation="v",
                 yanchor="top",
