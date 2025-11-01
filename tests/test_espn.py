@@ -283,3 +283,58 @@ class TestESPNFantasyLeague:
         # Should only include week 1
         assert len(matchups_df) == 2
         assert matchups_df["week"].unique().tolist() == [1]
+
+    @patch("requests.get")
+    def test_owner_name_remapping_will_hurd_to_jameson_voll(self, mock_get):
+        """Test that Will Hurd is remapped to Jameson Voll for 2024."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "members": [
+                {"id": "owner1", "firstName": "will", "lastName": "HURD"},
+                {"id": "owner2", "firstName": "Other", "lastName": "Owner"},
+            ],
+            "teams": [
+                {
+                    "id": 1,
+                    "name": "Team A",
+                    "primaryOwner": "owner1",
+                    "record": {
+                        "overall": {
+                            "wins": 5,
+                            "losses": 3,
+                            "pointsFor": 550.0,
+                            "pointsAgainst": 500.0,
+                        }
+                    },
+                },
+                {
+                    "id": 2,
+                    "name": "Team B",
+                    "primaryOwner": "owner2",
+                    "record": {
+                        "overall": {
+                            "wins": 4,
+                            "losses": 4,
+                            "pointsFor": 500.0,
+                            "pointsAgainst": 500.0,
+                        }
+                    },
+                },
+            ],
+        }
+        mock_get.return_value = mock_response
+
+        # Test for 2024 - should remap
+        league_2024 = ESPNFantasyLeague(league_id=123456, year=2024)
+        teams_df_2024 = league_2024.get_teams()
+
+        assert teams_df_2024.iloc[0]["owner"] == "Jameson Voll"
+        assert teams_df_2024.iloc[1]["owner"] == "Other Owner"
+
+        # Test for other years - should NOT remap
+        league_2023 = ESPNFantasyLeague(league_id=123456, year=2023)
+        teams_df_2023 = league_2023.get_teams()
+
+        assert teams_df_2023.iloc[0]["owner"] == "Will Hurd"
+        assert teams_df_2023.iloc[1]["owner"] == "Other Owner"
