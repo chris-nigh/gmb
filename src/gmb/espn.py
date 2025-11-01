@@ -121,7 +121,14 @@ class ESPNFantasyLeague:
             first_name = member.get("firstName", "")
             last_name = member.get("lastName", "")
             # Normalize to title case to handle inconsistent capitalization across years
-            owner_map[owner_id] = f"{first_name} {last_name}".strip().title()
+            owner_name = f"{first_name} {last_name}".strip().title()
+
+            # Apply hardcoded name remapping for ownership changes
+            # (e.g., when a team changes owners mid-history)
+            if owner_name == "Will Hurd" and self.year == 2024:
+                owner_name = "Jameson Voll"
+
+            owner_map[owner_id] = owner_name
 
         teams_data: list[dict[str, Any]] = []
         for team in data["teams"]:
