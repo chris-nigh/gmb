@@ -35,6 +35,10 @@ htmlcov/
 .tox/
 .hypothesis/
 
+# Pre-commit
+.pre-commit-config.yaml.swp
+.pre-commit-cache/
+
 # IDEs
 .vscode/
 .idea/

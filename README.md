@@ -20,15 +20,36 @@ A dashboard for tracking ESPN fantasy football leagues with advanced statistics 
 
 ## Installation
 
+### Prerequisites
+
+This project uses [uv](https://github.com/astral-sh/uv) for fast Python package management.
+
+Install uv:
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Or via pip
+pip install uv
+```
+
+### Setup
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/cnigh/gmb.git
 cd gmb
 ```
 
-2. Install in development mode:
+2. Run setup (creates venv and installs dependencies):
 ```bash
-pip install -e .
+make setup
+```
+
+Or manually:
+```bash
+uv venv
+uv pip install -e ".[dev]"
 ```
 
 ## Configuration
@@ -61,7 +82,7 @@ export GMB_SWID="your_swid"        # For private leagues
 
 Launch the interactive Streamlit dashboard:
 ```bash
-streamlit run app.py
+uv run streamlit run app.py
 ```
 
 The dashboard includes five main tabs:
@@ -167,8 +188,10 @@ Deploy on any Linux server:
 1. **Install dependencies**:
    ```bash
    sudo apt update
-   sudo apt install python3.13 python3-pip
-   pip install -e .
+   sudo apt install python3.13
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   uv venv
+   uv pip install -e .
    ```
 
 2. **Set environment variables**:
@@ -212,13 +235,21 @@ All deployment methods support these environment variables:
 ### Requirements
 
 - Python 3.13+
-- Dependencies managed via `pyproject.toml`
+- [uv](https://github.com/astral-sh/uv) for package management
+- Dependencies managed via `pyproject.toml` and `uv.lock`
+
+### Quick Start
+
+Run setup to create venv and install dependencies:
+```bash
+make setup
+```
 
 ### Testing
 
 Run tests with coverage:
 ```bash
-pytest
+uv run pytest --cov=src/gmb --cov-report=term-missing
 ```
 
 See [TESTING.md](TESTING.md) for detailed testing information.
@@ -226,17 +257,23 @@ See [TESTING.md](TESTING.md) for detailed testing information.
 ### Code Style
 
 This project uses:
+- **uv** for fast package management
 - **Ruff** for code formatting and linting (100-column width)
 - **Mypy** for type checking
 
 Format code:
 ```bash
-ruff format .
+uv run ruff format .
 ```
 
 Lint code:
 ```bash
-ruff check .
+uv run ruff check .
+```
+
+Type check:
+```bash
+uv run mypy src/gmb
 ```
 
 See [FORMATTING.md](FORMATTING.md) for detailed formatting guidelines.

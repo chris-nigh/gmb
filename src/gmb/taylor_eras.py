@@ -246,3 +246,86 @@ def get_historical_matchups_data(
             continue
 
     return all_matchups
+
+
+def get_historical_matchups_with_opponents(
+    league_id: int,
+    start_year: int,
+    end_year: int,
+    espn_s2: str | None = None,
+    swid: str | None = None,
+) -> pd.DataFrame:
+    """Fetch historical matchup data with opponent names and owner info.
+
+    This function fetches matchup data and includes opponent information
+    as well as owner names for both teams.
+
+    Args:
+        league_id: ESPN league ID
+        start_year: First year to fetch (inclusive)
+        end_year: Last year to fetch (inclusive)
+        espn_s2: ESPN session cookie (for private leagues)
+        swid: ESPN user ID cookie (for private leagues)
+
+    Returns:
+        DataFrame with columns: year, week, team_name, owner, opponent_name, opponent_owner, points, opponent_points
+    """
+    from .espn import ESPNFantasyLeague
+
+    all_matchups = []
+
+    for year in range(start_year, end_year + 1):
+        try:
+            league = ESPNFantasyLeague(
+                league_id=league_id,
+                year=year,
+                espn_s2=espn_s2,
+                swid=swid,
+            )
+
+            # Get teams to map team names to owners
+            teams_df = league.get_teams()
+            team_to_owner = {team["team_name"]: team["owner"] for _, team in teams_df.iterrows()}
+
+            # Get all matchups for this year
+            matchups_df = league.get_matchups()
+
+            if matchups_df.empty:
+                continue
+
+            # matchups_df should have: week, team_name, points, opponent_name, opponent_points
+            for _, matchup in matchups_df.iterrows():
+                team_name = matchup["team_name"]
+                opponent_name = matchup["opponent_name"]
+                all_matchups.append(
+                    {
+                        "year": year,
+                        "week": matchup["week"],
+                        "team_name": team_name,
+                        "owner": team_to_owner.get(team_name, "Unknown"),
+                        "opponent_name": opponent_name,
+                        "opponent_owner": team_to_owner.get(opponent_name, "Unknown"),
+                        "points": matchup["points"],
+                        "opponent_points": matchup["opponent_points"],
+                    }
+                )
+
+        except Exception as e:
+            print(f"Warning: Could not fetch data for year {year}: {e}")
+            continue
+
+    if not all_matchups:
+        return pd.DataFrame(
+            columns=[
+                "year",
+                "week",
+                "team_name",
+                "owner",
+                "opponent_name",
+                "opponent_owner",
+                "points",
+                "opponent_points",
+            ]
+        )
+
+    return pd.DataFrame(all_matchups)

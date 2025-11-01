@@ -521,6 +521,157 @@ def draft_value(
         raise typer.Exit(1)
 
 
+@app.command()
+def h2h(
+    start_year: int = typer.Option(2006, help="Start year for historical analysis"),
+    end_year: int = typer.Option(
+        None, help="End year for historical analysis (default: current year)"
+    ),
+    output: str = typer.Option(
+        None, help="Output CSV file path (default: h2h_records_<end_year>.csv)"
+    ),
+) -> None:
+    """Analyze head-to-head records between owners across league history.
+
+    Shows winning percentage matrix organized by owner and exports detailed
+    records to CSV. Includes all matchups from start_year to end_year.
+    """
+    try:
+        import pandas as pd
+
+        from .taylor_eras import get_historical_matchups_with_opponents
+        from .viz import FantasyDashboard
+
+        config = DashboardConfig.load()
+
+        # Use current year if end_year not specified
+        if end_year is None:
+            end_year = config.year
+
+        # Default output filename
+        if output is None:
+            output = f"h2h_records_{end_year}.csv"
+
+        rprint(f"\n[bold]Head-to-Head Analysis: {start_year}-{end_year}[/bold]")
+        rprint(f"[dim]League ID: {config.league_id}[/dim]\n")
+
+        # Load historical data
+        rprint(
+            f"[yellow]Loading historical matchup data ({end_year - start_year + 1} years)...[/yellow]"
+        )
+        historical_df = get_historical_matchups_with_opponents(
+            league_id=config.league_id,
+            start_year=start_year,
+            end_year=end_year,
+            espn_s2=config.espn_s2,
+            swid=config.swid,
+        )
+
+        if historical_df.empty:
+            rprint("[red]No historical data available.[/red]")
+            raise typer.Exit(1)
+
+        # Create dashboard instance for analysis
+        league = ESPNFantasyLeague(**config.to_dict())
+        dashboard = FantasyDashboard(league)
+
+        # Compute H2H matrix by owner
+        rprint("[yellow]Computing head-to-head records by owner...[/yellow]")
+        h2h_matrix = dashboard.compute_h2h_matrix_by_owner(historical_df)
+
+        # Display the matrix
+        rprint("\n[bold]Head-to-Head Win Percentage Matrix (by Owner):[/bold]")
+        rprint("[dim]" + "-" * 80 + "[/dim]")
+
+        # Format matrix for display
+        display_matrix = h2h_matrix.copy()
+        display_matrix = display_matrix.fillna("-")
+        display_matrix = display_matrix.map(
+            lambda x: f"{x:.1%}" if isinstance(x, float) else str(x)
+        )
+        rprint(display_matrix.to_string())
+
+        # Calculate and show aggregate statistics by owner
+        rprint("\n[bold]Aggregate Head-to-Head Records (All-Time):[/bold]")
+        rprint("[dim]" + "-" * 80 + "[/dim]")
+
+        h2h_records = []
+        owners = sorted(historical_df["owner"].unique())
+
+        for owner in owners:
+            owner_matchups = historical_df[historical_df["owner"] == owner]
+            wins = (owner_matchups["points"] > owner_matchups["opponent_points"]).sum()
+            losses = (owner_matchups["points"] < owner_matchups["opponent_points"]).sum()
+            total = wins + losses
+
+            if total > 0:
+                win_pct = wins / total
+                h2h_records.append(
+                    {
+                        "owner": owner,
+                        "wins": int(wins),
+                        "losses": int(losses),
+                        "total": int(total),
+                        "win_pct": win_pct,
+                    }
+                )
+
+        if h2h_records:
+            record_df = pd.DataFrame(h2h_records)
+            record_df = record_df.sort_values("win_pct", ascending=False)
+            record_df["win_pct_str"] = record_df["win_pct"].apply(lambda x: f"{x:.1%}")
+            display_records = record_df[["owner", "wins", "losses", "total", "win_pct_str"]]
+            display_records.columns = ["Owner", "Wins", "Losses", "Total Games", "Win %"]
+            rprint(display_records.to_string(index=False))
+
+        # Export detailed records to CSV
+        rprint(f"\n[yellow]Exporting detailed records to {output}...[/yellow]")
+
+        # Create detailed export dataframe
+        export_records = []
+        for owner in owners:
+            owner_matchups = historical_df[historical_df["owner"] == owner]
+
+            for opponent_owner in sorted(owner_matchups["opponent_owner"].unique()):
+                if opponent_owner == owner:
+                    continue
+
+                opponent_matchups = owner_matchups[
+                    owner_matchups["opponent_owner"] == opponent_owner
+                ]
+                wins = (opponent_matchups["points"] > opponent_matchups["opponent_points"]).sum()
+                losses = (opponent_matchups["points"] < opponent_matchups["opponent_points"]).sum()
+                total = wins + losses
+
+                if total > 0:
+                    win_pct = wins / total
+                    export_records.append(
+                        {
+                            "owner": owner,
+                            "opponent": opponent_owner,
+                            "wins": int(wins),
+                            "losses": int(losses),
+                            "total": int(total),
+                            "win_pct": f"{win_pct:.1%}",
+                        }
+                    )
+
+        if export_records:
+            export_df = pd.DataFrame(export_records)
+            export_df = export_df.sort_values(["owner", "win_pct"], ascending=[True, False])
+            export_df.to_csv(output, index=False)
+            rprint(f"[green]✓ Records exported to: {output}[/green]")
+
+        rprint("[green]✓ Analysis complete![/green]")
+
+    except Exception as e:
+        rprint(f"[red]Error analyzing head-to-head records: {e}[/red]")
+        import traceback
+
+        rprint(f"[dim]{traceback.format_exc()}[/dim]")
+        raise typer.Exit(1)
+
+
 def main() -> None:
     """Main CLI entry point."""
     app()

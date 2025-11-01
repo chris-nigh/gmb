@@ -1,0 +1,96 @@
+# Pre-commit hooks for GMB Fantasy Football Dashboard
+# Mirrors the GitHub CI pipeline to catch issues before pushing
+#
+# Installation:
+#   uv pip install pre-commit
+#   pre-commit install
+#
+# Manual run:
+#   pre-commit run --all-files
+#
+# Update hooks to latest versions:
+#   pre-commit autoupdate
+
+repos:
+  # Ruff - Fast Python linter and formatter (replaces black, isort, flake8, etc.)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.1
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+        name: ruff format
+        description: Format code with ruff
+
+      # Run the linter
+      - id: ruff
+        name: ruff check
+        description: Lint code with ruff
+        args: [--fix]  # Auto-fix what's possible
+
+  # MyPy - Static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.0
+    hooks:
+      - id: mypy
+        name: mypy type checking
+        description: Run mypy type checker
+        files: ^src/gmb/
+        additional_dependencies:
+          - types-requests>=2.31.0
+          - types-PyYAML>=6.0.0
+
+  # Pytest - Run tests with coverage
+  - repo: local
+    hooks:
+      - id: pytest-cov
+        name: pytest with coverage
+        description: Run tests with coverage reporting
+        entry: pytest
+        args:
+          - --cov=src/gmb
+          - --cov-report=term-missing
+          - --cov-fail-under=0  # Don't fail on coverage % (just report it)
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # Standard pre-commit hooks for basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        description: Remove trailing whitespace
+
+      - id: end-of-file-fixer
+        name: fix end of files
+        description: Ensure files end with newline
+
+      - id: check-yaml
+        name: check yaml syntax
+        description: Validate YAML files
+
+      - id: check-toml
+        name: check toml syntax
+        description: Validate TOML files
+
+      - id: check-added-large-files
+        name: check for large files
+        description: Prevent large files from being committed
+        args: [--maxkb=500]
+
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        description: Detect merge conflict markers
+
+      - id: debug-statements
+        name: check for debug statements
+        description: Detect debug statements (pdb, breakpoint, etc.)
+
+# Configuration
+default_language_version:
+  python: python3.13
+
+# Global settings
+fail_fast: false  # Run all hooks even if one fails

@@ -170,7 +170,14 @@ def main():
             with col1:
                 st.metric("Total Teams", len(dashboard.teams_df))
             with col2:
-                st.metric("Avg Points/Game", f"{dashboard.teams_df['points_for'].mean():.1f}")
+                # Calculate avg points per game across all teams
+                dashboard.teams_df["games_played"] = (
+                    dashboard.teams_df["wins"] + dashboard.teams_df["losses"]
+                )
+                avg_ppg = (
+                    dashboard.teams_df["points_for"] / dashboard.teams_df["games_played"]
+                ).mean()
+                st.metric("Avg Points/Game", f"{avg_ppg:.1f}")
             with col3:
                 highest_scorer = dashboard.teams_df.loc[
                     dashboard.teams_df["points_for"].idxmax(), "team_name"
@@ -178,9 +185,10 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
             [
                 "📊 Overview",
+                "🤝 Head-to-Head Records",
                 "🎯 OIWP Analysis",
                 "🔒 Keepers",
                 "🎲 Keeper What-If",
@@ -219,17 +227,109 @@ def main():
             else:
                 st.warning("Matchup data not available for analytics")
 
-        # Power Rankings tab (hidden for now, keeping code)
-        # with tab2:
-        #     st.subheader("Power Rankings")
-        #     if dashboard.teams_df is not None:
-        #         rankings = dashboard.generate_power_rankings()
-        #         st.dataframe(rankings, use_container_width=True)
-        #
-        #         st.info(
-        #             "Power rankings are calculated using a weighted formula: "
-        #             "60% wins + 40% normalized points scored"
-        #         )
+        with tab2:
+            st.subheader("Head-to-Head Records by Owner (Historical)")
+
+            if dashboard.matchups_df is not None and not dashboard.matchups_df.empty:
+                # Cache historical data loading
+                @st.cache_data(ttl=3600)
+                def load_h2h_historical_data(
+                    league_id: int,
+                    start_year: int,
+                    end_year: int,
+                    espn_s2: str | None,
+                    swid: str | None,
+                ):
+                    """Load historical matchup data for H2H analysis."""
+                    from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+                    return get_historical_matchups_with_opponents(
+                        league_id, start_year, end_year, espn_s2, swid
+                    )
+
+                # Get current year from config
+                year = config.year
+
+                # Load historical data from 2006 to current year
+                with st.spinner("Loading historical head-to-head data (2006-present)..."):
+                    historical_df = load_h2h_historical_data(
+                        league_id=config.league_id,
+                        start_year=2006,
+                        end_year=year,
+                        espn_s2=config.espn_s2,
+                        swid=config.swid,
+                    )
+
+                if not historical_df.empty:
+                    # Create heatmap with historical data
+                    st.markdown(
+                        "### Historical Head-to-Head Win Percentage Matrix (by Owner, 2006-Present)"
+                    )
+                    st.write(
+                        "This heatmap shows the winning percentage of each owner against every other owner "
+                        "across the entire league history."
+                    )
+                    dashboard.create_h2h_heatmap_by_owner(historical_df)
+
+                    st.markdown("### Head-to-Head Record by Season")
+                    st.write(
+                        "Select an owner to view their winning percentage vs each opponent by season."
+                    )
+
+                    # Owner selector
+                    owners = sorted(historical_df["owner"].unique())
+                    selected_owner = st.selectbox("Select Owner", owners, key="h2h_owner_selector")
+
+                    # Create line chart for selected owner by season
+                    if selected_owner:
+                        dashboard.create_h2h_season_line_chart(selected_owner, historical_df)
+
+                        # Show detailed table for selected owner
+                        owner_matchups = historical_df[
+                            historical_df["owner"] == selected_owner
+                        ].copy()
+                        if not owner_matchups.empty:
+                            st.markdown("### Detailed Historical H2H Record (All-Time)")
+
+                            # Calculate aggregate stats vs each opponent
+                            h2h_records = []
+                            for opponent_owner in sorted(owner_matchups["opponent_owner"].unique()):
+                                if opponent_owner == selected_owner:
+                                    continue
+
+                                opponent_matchups = owner_matchups[
+                                    owner_matchups["opponent_owner"] == opponent_owner
+                                ]
+                                wins = (
+                                    opponent_matchups["points"]
+                                    > opponent_matchups["opponent_points"]
+                                ).sum()
+                                losses = (
+                                    opponent_matchups["points"]
+                                    < opponent_matchups["opponent_points"]
+                                ).sum()
+                                total = wins + losses
+
+                                if total > 0:
+                                    win_pct = wins / total
+                                    h2h_records.append(
+                                        {
+                                            "opponent": opponent_owner,
+                                            "wins": int(wins),
+                                            "losses": int(losses),
+                                            "win_pct": f"{win_pct:.1%}",
+                                        }
+                                    )
+
+                            if h2h_records:
+                                record_df = pd.DataFrame(h2h_records)
+                                record_df = record_df.sort_values("win_pct", ascending=False)
+                                record_df.columns = ["Opponent", "Wins", "Losses", "Win %"]
+                                st.dataframe(record_df, use_container_width=True, hide_index=True)
+                else:
+                    st.warning("Unable to load historical head-to-head data")
+            else:
+                st.warning("Matchup data not available for head-to-head analysis")
 
         with tab3:
             st.subheader("Opponent-Independent Winning Percentage (OIWP)")
