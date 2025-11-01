@@ -895,3 +895,432 @@ class FantasyDashboard:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+    def compute_h2h_matrix(self, historical_matchups: pd.DataFrame | None = None) -> pd.DataFrame:
+        """Compute head-to-head win record matrix for all teams.
+
+        Args:
+            historical_matchups: Optional DataFrame with historical matchup data.
+                If None, uses current season data from self.matchups_df.
+                Expected columns: team_name, opponent_name, points, opponent_points
+
+        Returns:
+            Matrix where rows/cols are team names and values are win percentages
+            (wins / total_games) for each head-to-head matchup
+        """
+        if historical_matchups is not None:
+            matchups = historical_matchups.copy()
+        else:
+            if self.matchups_df is None:
+                self.load_data()
+            if self.matchups_df is None:
+                raise ValueError("Failed to load matchup data")
+            matchups = self.matchups_df.copy()
+
+        # Get unique team names
+        teams = sorted(list(matchups["team_name"].unique()))
+
+        # Build win and count matrices using dictionaries
+        wins: dict[tuple[str, str], float] = {(t1, t2): 0.0 for t1 in teams for t2 in teams}
+        counts: dict[tuple[str, str], int] = {(t1, t2): 0 for t1 in teams for t2 in teams}
+
+        # For each matchup, record the result
+        for _, row in matchups.iterrows():
+            team = str(row["team_name"])
+            opponent = str(row["opponent_name"])
+            team_score = float(row["points"])
+            opponent_score = float(row["opponent_points"])
+
+            # Only count if both teams exist
+            if team in teams and opponent in teams:
+                # Team wins if score is higher
+                if team_score > opponent_score:
+                    wins[(team, opponent)] += 1
+                counts[(team, opponent)] += 1
+
+        # Create result matrix with win percentages
+        h2h_matrix = pd.DataFrame(None, index=teams, columns=teams)
+
+        for team in teams:
+            for opponent in teams:
+                if team == opponent:
+                    h2h_matrix.loc[team, opponent] = None  # No self-matchups
+                elif counts[(team, opponent)] > 0:
+                    h2h_matrix.loc[team, opponent] = wins[(team, opponent)] / counts[(team, opponent)]
+                else:
+                    h2h_matrix.loc[team, opponent] = None
+
+        return h2h_matrix
+
+    def compute_h2h_history(self, historical_matchups: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+        """Compute head-to-head records over time, grouped by league year.
+
+        Args:
+            historical_matchups: Optional DataFrame with historical matchup data.
+                If None, uses current season data from self.matchups_df.
+                Expected columns: team_name, opponent_name, points, opponent_points
+
+        Returns:
+            Dictionary mapping team names to DataFrames with columns:
+            - opponent: opponent team name
+            - wins: wins vs that opponent
+            - losses: losses vs that opponent
+            - win_pct: winning percentage vs that opponent
+        """
+        if historical_matchups is not None:
+            matchups = historical_matchups.copy()
+        else:
+            if self.matchups_df is None:
+                self.load_data()
+            if self.matchups_df is None:
+                raise ValueError("Failed to load matchup data")
+            matchups = self.matchups_df.copy()
+
+        # Group by team and compute h2h records
+        h2h_history = {}
+        teams = sorted(matchups["team_name"].unique())
+
+        for team in teams:
+            team_matchups = matchups[matchups["team_name"] == team].copy()
+            h2h_records = []
+
+            for opponent in teams:
+                if team == opponent:
+                    continue
+
+                opponent_matchups = team_matchups[team_matchups["opponent_name"] == opponent]
+
+                if opponent_matchups.empty:
+                    continue
+
+                wins = (opponent_matchups["points"] > opponent_matchups["opponent_points"]).sum()
+                losses = (opponent_matchups["points"] < opponent_matchups["opponent_points"]).sum()
+                total = wins + losses
+
+                if total > 0:
+                    win_pct = wins / total
+                    h2h_records.append(
+                        {
+                            "opponent": opponent,
+                            "wins": wins,
+                            "losses": losses,
+                            "win_pct": win_pct,
+                        }
+                    )
+
+            if h2h_records:
+                h2h_history[team] = pd.DataFrame(h2h_records)
+
+        return h2h_history
+
+    def create_h2h_heatmap(self, historical_matchups: pd.DataFrame | None = None) -> None:
+        """Create heatmap visualization of head-to-head records.
+
+        Args:
+            historical_matchups: Optional historical matchup data. If None, uses current season.
+        """
+        h2h_matrix = self.compute_h2h_matrix(historical_matchups)
+
+        # Create heatmap
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=h2h_matrix.values,
+                x=h2h_matrix.columns,
+                y=h2h_matrix.index,
+                colorscale=[
+                    [0, "#dc3545"],  # Red for 0% win
+                    [0.5, "#ffc107"],  # Yellow for 50% win
+                    [1, "#28a745"],  # Green for 100% win
+                ],
+                zmin=0,
+                zmax=1,
+                text=h2h_matrix.values,
+                texttemplate="%{text:.1%}",
+                textfont={"size": 11, "color": "white"},
+                colorbar=dict(
+                    title="Win %",
+                    tickformat=".0%",
+                ),
+                hovertemplate="<b>%{y} vs %{x}</b><br>Win %: %{text:.1%}<extra></extra>",
+            )
+        )
+
+        fig.update_layout(
+            title="Head-to-Head Win Percentage Matrix",
+            xaxis_title="Opponent",
+            yaxis_title="Team",
+            height=600,
+            width=800,
+            xaxis={"tickangle": -45},
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    def create_h2h_line_chart(
+        self, selected_team: str, historical_matchups: pd.DataFrame | None = None
+    ) -> None:
+        """Create line chart of winning percentage vs all opponents for a selected team.
+
+        Args:
+            selected_team: Team name to analyze
+            historical_matchups: Optional historical matchup data. If None, uses current season.
+        """
+        h2h_history = self.compute_h2h_history(historical_matchups)
+
+        if selected_team not in h2h_history or h2h_history[selected_team].empty:
+            st.warning(f"No head-to-head data available for {selected_team}")
+            return
+
+        # Get h2h data for selected team
+        team_h2h = h2h_history[selected_team].copy()
+
+        # Sort by opponent name for consistency
+        team_h2h = team_h2h.sort_values("opponent")
+
+        # Create line chart
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=team_h2h["opponent"],
+                y=team_h2h["win_pct"],
+                mode="lines+markers",
+                name="Win %",
+                line=dict(color="#2D5F3F", width=3),
+                marker=dict(size=8, color="#4A7C59", line=dict(width=2, color="#2D5F3F")),
+                fill="tozeroy",
+                fillcolor="rgba(45, 95, 63, 0.2)",
+                hovertemplate="<b>%{x}</b><br>Win %: %{y:.1%}<extra></extra>",
+            )
+        )
+
+        # Add 50% reference line
+        fig.add_hline(
+            y=0.5,
+            line_dash="dash",
+            line_color="#6c757d",
+            opacity=0.5,
+            annotation_text="50% (Break-even)",
+            annotation_position="right",
+        )
+
+        fig.update_layout(
+            title=f"Head-to-Head Winning Percentage: {selected_team}",
+            xaxis_title="Opponent",
+            yaxis_title="Win Percentage",
+            height=500,
+            xaxis={"tickangle": -45},
+            yaxis=dict(tickformat=".0%", range=[0, 1]),
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+            hovermode="x unified",
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    def compute_h2h_matrix_by_owner(self, historical_matchups: pd.DataFrame | None = None) -> pd.DataFrame:
+        """Compute head-to-head win record matrix organized by owner.
+
+        Args:
+            historical_matchups: Optional DataFrame with historical matchup data.
+                Expected columns: owner, opponent_owner, points, opponent_points
+
+        Returns:
+            Matrix where rows/cols are owner names and values are win percentages
+        """
+        if historical_matchups is not None:
+            matchups = historical_matchups.copy()
+        else:
+            if self.matchups_df is None:
+                self.load_data()
+            if self.matchups_df is None:
+                raise ValueError("Failed to load matchup data")
+            matchups = self.matchups_df.copy()
+
+        # Get unique owner names
+        owners = sorted(list(matchups["owner"].unique()))
+
+        # Build win and count matrices using dictionaries
+        wins: dict[tuple[str, str], float] = {(o1, o2): 0.0 for o1 in owners for o2 in owners}
+        counts: dict[tuple[str, str], int] = {(o1, o2): 0 for o1 in owners for o2 in owners}
+
+        # For each matchup, record the result
+        for _, row in matchups.iterrows():
+            owner = str(row["owner"])
+            opponent_owner = str(row["opponent_owner"])
+            owner_score = float(row["points"])
+            opponent_score = float(row["opponent_points"])
+
+            # Only count if both owners exist
+            if owner in owners and opponent_owner in owners:
+                # Owner wins if score is higher
+                if owner_score > opponent_score:
+                    wins[(owner, opponent_owner)] += 1
+                counts[(owner, opponent_owner)] += 1
+
+        # Create result matrix with win percentages
+        h2h_matrix = pd.DataFrame(None, index=owners, columns=owners)
+
+        for owner in owners:
+            for opponent_owner in owners:
+                if owner == opponent_owner:
+                    h2h_matrix.loc[owner, opponent_owner] = None  # No self-matchups
+                elif counts[(owner, opponent_owner)] > 0:
+                    h2h_matrix.loc[owner, opponent_owner] = (
+                        wins[(owner, opponent_owner)] / counts[(owner, opponent_owner)]
+                    )
+                else:
+                    h2h_matrix.loc[owner, opponent_owner] = None
+
+        return h2h_matrix
+
+    def create_h2h_heatmap_by_owner(self, historical_matchups: pd.DataFrame | None = None) -> None:
+        """Create heatmap visualization of head-to-head records organized by owner.
+
+        Args:
+            historical_matchups: Optional historical matchup data. If None, uses current season.
+        """
+        h2h_matrix = self.compute_h2h_matrix_by_owner(historical_matchups)
+
+        # Create heatmap
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=h2h_matrix.values,
+                x=h2h_matrix.columns,
+                y=h2h_matrix.index,
+                colorscale=[
+                    [0, "#dc3545"],  # Red for 0% win
+                    [0.5, "#ffc107"],  # Yellow for 50% win
+                    [1, "#28a745"],  # Green for 100% win
+                ],
+                zmin=0,
+                zmax=1,
+                text=h2h_matrix.values,
+                texttemplate="%{text:.1%}",
+                textfont={"size": 11, "color": "white"},
+                colorbar=dict(
+                    title="Win %",
+                    tickformat=".0%",
+                ),
+                hovertemplate="<b>%{y} vs %{x}</b><br>Win %: %{text:.1%}<extra></extra>",
+            )
+        )
+
+        fig.update_layout(
+            title="Head-to-Head Win Percentage Matrix (by Owner)",
+            xaxis_title="Opponent",
+            yaxis_title="Owner",
+            height=600,
+            width=800,
+            xaxis={"tickangle": -45},
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    def create_h2h_season_line_chart(self, selected_owner: str, historical_matchups: pd.DataFrame | None = None) -> None:
+        """Create line chart showing owner's winning percentage vs each opponent by season.
+
+        Args:
+            selected_owner: Owner name to analyze
+            historical_matchups: Optional historical matchup data. Expected to have 'year' column.
+        """
+        if historical_matchups is not None:
+            matchups = historical_matchups.copy()
+        else:
+            if self.matchups_df is None:
+                self.load_data()
+            if self.matchups_df is None:
+                raise ValueError("Failed to load matchup data")
+            matchups = self.matchups_df.copy()
+
+        # Filter to selected owner's matchups
+        owner_matchups = matchups[matchups["owner"] == selected_owner].copy()
+
+        if owner_matchups.empty:
+            st.warning(f"No head-to-head data available for {selected_owner}")
+            return
+
+        # Get unique opponents
+        opponents = sorted(owner_matchups["opponent_owner"].unique())
+
+        # Calculate cumulative win percentage over time for each opponent
+        fig = go.Figure()
+
+        for opponent in opponents:
+            opponent_matchups = owner_matchups[owner_matchups["opponent_owner"] == opponent].copy()
+
+            # Sort by year and week to get chronological order
+            if "year" in opponent_matchups.columns:
+                opponent_matchups = opponent_matchups.sort_values(["year", "week"]).reset_index(drop=True)
+
+                # Calculate wins/losses per game
+                opponent_matchups["win"] = (
+                    opponent_matchups["points"] > opponent_matchups["opponent_points"]
+                ).astype(int)
+                opponent_matchups["loss"] = (
+                    opponent_matchups["points"] < opponent_matchups["opponent_points"]
+                ).astype(int)
+
+                # Calculate cumulative wins and losses
+                opponent_matchups["cum_wins"] = opponent_matchups["win"].cumsum()
+                opponent_matchups["cum_losses"] = opponent_matchups["loss"].cumsum()
+                opponent_matchups["cum_total"] = opponent_matchups["cum_wins"] + opponent_matchups["cum_losses"]
+                opponent_matchups["cum_win_pct"] = opponent_matchups["cum_wins"] / opponent_matchups["cum_total"]
+
+                if len(opponent_matchups) > 0:
+                    # Create a year-week label for each point
+                    opponent_matchups["label"] = opponent_matchups["year"].astype(str) + "-W" + opponent_matchups["week"].astype(str)
+
+                    fig.add_trace(
+                        go.Scatter(
+                            x=opponent_matchups["year"],
+                            y=opponent_matchups["cum_win_pct"],
+                            mode="lines+markers",
+                            name=opponent,
+                            line=dict(width=2),
+                            marker=dict(size=6),
+                            hovertemplate="<b>"
+                            + opponent
+                            + "</b><br>Season: %{x}<br>Game: %{customdata[0]}<br>Cumulative Win %: %{y:.1%}<extra></extra>",
+                            customdata=opponent_matchups[["label"]],
+                        )
+                    )
+
+        # Add 50% reference line
+        if not owner_matchups.empty and "year" in owner_matchups.columns:
+            fig.add_hline(
+                y=0.5,
+                line_dash="dash",
+                line_color="#6c757d",
+                opacity=0.5,
+                annotation_text="50% (Break-even)",
+                annotation_position="right",
+            )
+
+        fig.update_layout(
+            title=f"Cumulative Head-to-Head Record: {selected_owner}",
+            xaxis_title="Season (Year)",
+            yaxis_title="Cumulative Win Percentage",
+            height=500,
+            yaxis=dict(tickformat=".0%", range=[0, 1]),
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            font=dict(color="#1A3329"),
+            hovermode="x unified",
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+            ),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
