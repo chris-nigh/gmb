@@ -524,8 +524,12 @@ def draft_value(
 @app.command()
 def h2h(
     start_year: int = typer.Option(2006, help="Start year for historical analysis"),
-    end_year: int = typer.Option(None, help="End year for historical analysis (default: current year)"),
-    output: str = typer.Option(None, help="Output CSV file path (default: h2h_records_<end_year>.csv)"),
+    end_year: int = typer.Option(
+        None, help="End year for historical analysis (default: current year)"
+    ),
+    output: str = typer.Option(
+        None, help="Output CSV file path (default: h2h_records_<end_year>.csv)"
+    ),
 ) -> None:
     """Analyze head-to-head records between owners across league history.
 
@@ -552,7 +556,9 @@ def h2h(
         rprint(f"[dim]League ID: {config.league_id}[/dim]\n")
 
         # Load historical data
-        rprint(f"[yellow]Loading historical matchup data ({end_year - start_year + 1} years)...[/yellow]")
+        rprint(
+            f"[yellow]Loading historical matchup data ({end_year - start_year + 1} years)...[/yellow]"
+        )
         historical_df = get_historical_matchups_with_opponents(
             league_id=config.league_id,
             start_year=start_year,
@@ -630,7 +636,9 @@ def h2h(
                 if opponent_owner == owner:
                     continue
 
-                opponent_matchups = owner_matchups[owner_matchups["opponent_owner"] == opponent_owner]
+                opponent_matchups = owner_matchups[
+                    owner_matchups["opponent_owner"] == opponent_owner
+                ]
                 wins = (opponent_matchups["points"] > opponent_matchups["opponent_points"]).sum()
                 losses = (opponent_matchups["points"] < opponent_matchups["opponent_points"]).sum()
                 total = wins + losses

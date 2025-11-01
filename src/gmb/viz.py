@@ -946,13 +946,17 @@ class FantasyDashboard:
                 if team == opponent:
                     h2h_matrix.loc[team, opponent] = None  # No self-matchups
                 elif counts[(team, opponent)] > 0:
-                    h2h_matrix.loc[team, opponent] = wins[(team, opponent)] / counts[(team, opponent)]
+                    h2h_matrix.loc[team, opponent] = (
+                        wins[(team, opponent)] / counts[(team, opponent)]
+                    )
                 else:
                     h2h_matrix.loc[team, opponent] = None
 
         return h2h_matrix
 
-    def compute_h2h_history(self, historical_matchups: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+    def compute_h2h_history(
+        self, historical_matchups: pd.DataFrame | None = None
+    ) -> dict[str, pd.DataFrame]:
         """Compute head-to-head records over time, grouped by league year.
 
         Args:
@@ -1122,7 +1126,9 @@ class FantasyDashboard:
 
         st.plotly_chart(fig, use_container_width=True)
 
-    def compute_h2h_matrix_by_owner(self, historical_matchups: pd.DataFrame | None = None) -> pd.DataFrame:
+    def compute_h2h_matrix_by_owner(
+        self, historical_matchups: pd.DataFrame | None = None
+    ) -> pd.DataFrame:
         """Compute head-to-head win record matrix organized by owner.
 
         Args:
@@ -1261,7 +1267,9 @@ class FantasyDashboard:
 
         st.plotly_chart(fig, use_container_width=True)
 
-    def create_h2h_season_line_chart(self, selected_owner: str, historical_matchups: pd.DataFrame | None = None) -> None:
+    def create_h2h_season_line_chart(
+        self, selected_owner: str, historical_matchups: pd.DataFrame | None = None
+    ) -> None:
         """Create line chart showing owner's winning percentage vs each opponent by season.
 
         Args:
@@ -1295,7 +1303,9 @@ class FantasyDashboard:
 
             # Sort by year and week to get chronological order
             if "year" in opponent_matchups.columns:
-                opponent_matchups = opponent_matchups.sort_values(["year", "week"]).reset_index(drop=True)
+                opponent_matchups = opponent_matchups.sort_values(["year", "week"]).reset_index(
+                    drop=True
+                )
 
                 # Calculate wins/losses per game
                 opponent_matchups["win"] = (
@@ -1308,14 +1318,26 @@ class FantasyDashboard:
                 # Calculate cumulative wins and losses
                 opponent_matchups["cum_wins"] = opponent_matchups["win"].cumsum()
                 opponent_matchups["cum_losses"] = opponent_matchups["loss"].cumsum()
-                opponent_matchups["cum_total"] = opponent_matchups["cum_wins"] + opponent_matchups["cum_losses"]
-                opponent_matchups["cum_win_pct"] = opponent_matchups["cum_wins"] / opponent_matchups["cum_total"]
+                opponent_matchups["cum_total"] = (
+                    opponent_matchups["cum_wins"] + opponent_matchups["cum_losses"]
+                )
+                opponent_matchups["cum_win_pct"] = (
+                    opponent_matchups["cum_wins"] / opponent_matchups["cum_total"]
+                )
 
                 if len(opponent_matchups) > 0:
                     # Create a year-week label for each point
-                    opponent_matchups["label"] = opponent_matchups["year"].astype(str) + "-W" + opponent_matchups["week"].astype(str)
+                    opponent_matchups["label"] = (
+                        opponent_matchups["year"].astype(str)
+                        + "-W"
+                        + opponent_matchups["week"].astype(str)
+                    )
                     # Create record string (wins-losses)
-                    opponent_matchups["record"] = opponent_matchups["cum_wins"].astype(str) + "-" + opponent_matchups["cum_losses"].astype(str)
+                    opponent_matchups["record"] = (
+                        opponent_matchups["cum_wins"].astype(str)
+                        + "-"
+                        + opponent_matchups["cum_losses"].astype(str)
+                    )
 
                     fig.add_trace(
                         go.Scatter(

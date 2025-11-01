@@ -234,12 +234,18 @@ def main():
                 # Cache historical data loading
                 @st.cache_data(ttl=3600)
                 def load_h2h_historical_data(
-                    league_id: int, start_year: int, end_year: int, espn_s2: str | None, swid: str | None
+                    league_id: int,
+                    start_year: int,
+                    end_year: int,
+                    espn_s2: str | None,
+                    swid: str | None,
                 ):
                     """Load historical matchup data for H2H analysis."""
                     from gmb.taylor_eras import get_historical_matchups_with_opponents
 
-                    return get_historical_matchups_with_opponents(league_id, start_year, end_year, espn_s2, swid)
+                    return get_historical_matchups_with_opponents(
+                        league_id, start_year, end_year, espn_s2, swid
+                    )
 
                 # Get current year from config
                 year = config.year
@@ -256,7 +262,9 @@ def main():
 
                 if not historical_df.empty:
                     # Create heatmap with historical data
-                    st.markdown("### Historical Head-to-Head Win Percentage Matrix (by Owner, 2006-Present)")
+                    st.markdown(
+                        "### Historical Head-to-Head Win Percentage Matrix (by Owner, 2006-Present)"
+                    )
                     st.write(
                         "This heatmap shows the winning percentage of each owner against every other owner "
                         "across the entire league history."
@@ -264,7 +272,9 @@ def main():
                     dashboard.create_h2h_heatmap_by_owner(historical_df)
 
                     st.markdown("### Head-to-Head Record by Season")
-                    st.write("Select an owner to view their winning percentage vs each opponent by season.")
+                    st.write(
+                        "Select an owner to view their winning percentage vs each opponent by season."
+                    )
 
                     # Owner selector
                     owners = sorted(historical_df["owner"].unique())
@@ -275,7 +285,9 @@ def main():
                         dashboard.create_h2h_season_line_chart(selected_owner, historical_df)
 
                         # Show detailed table for selected owner
-                        owner_matchups = historical_df[historical_df["owner"] == selected_owner].copy()
+                        owner_matchups = historical_df[
+                            historical_df["owner"] == selected_owner
+                        ].copy()
                         if not owner_matchups.empty:
                             st.markdown("### Detailed Historical H2H Record (All-Time)")
 
@@ -285,19 +297,29 @@ def main():
                                 if opponent_owner == selected_owner:
                                     continue
 
-                                opponent_matchups = owner_matchups[owner_matchups["opponent_owner"] == opponent_owner]
-                                wins = (opponent_matchups["points"] > opponent_matchups["opponent_points"]).sum()
-                                losses = (opponent_matchups["points"] < opponent_matchups["opponent_points"]).sum()
+                                opponent_matchups = owner_matchups[
+                                    owner_matchups["opponent_owner"] == opponent_owner
+                                ]
+                                wins = (
+                                    opponent_matchups["points"]
+                                    > opponent_matchups["opponent_points"]
+                                ).sum()
+                                losses = (
+                                    opponent_matchups["points"]
+                                    < opponent_matchups["opponent_points"]
+                                ).sum()
                                 total = wins + losses
 
                                 if total > 0:
                                     win_pct = wins / total
-                                    h2h_records.append({
-                                        "opponent": opponent_owner,
-                                        "wins": int(wins),
-                                        "losses": int(losses),
-                                        "win_pct": f"{win_pct:.1%}"
-                                    })
+                                    h2h_records.append(
+                                        {
+                                            "opponent": opponent_owner,
+                                            "wins": int(wins),
+                                            "losses": int(losses),
+                                            "win_pct": f"{win_pct:.1%}",
+                                        }
+                                    )
 
                             if h2h_records:
                                 record_df = pd.DataFrame(h2h_records)
