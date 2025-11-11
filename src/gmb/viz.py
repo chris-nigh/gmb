@@ -1533,17 +1533,32 @@ class FantasyDashboard:
 
             # For each other team's schedule
             for schedule_owner in owners:
-                # Get the opponents this schedule faced (by week)
-                schedule_opponents = (
-                    year_data[year_data["owner"] == schedule_owner][["week", "opponent_points"]]
-                    .sort_values("week")
-                    .set_index("week")["opponent_points"]
-                )
+                # Get the schedule: weeks and opponent scores
+                schedule_data = year_data[year_data["owner"] == schedule_owner][
+                    ["week", "opponent_points", "opponent_owner"]
+                ].sort_values("week")
+                schedule_opponents = schedule_data.set_index("week")["opponent_points"]
 
                 # Calculate wins with this schedule
                 # (team's scores vs schedule's opponents, matched by week)
                 common_weeks = team_scores.index.intersection(schedule_opponents.index)
-                wins = (team_scores.loc[common_weeks] > schedule_opponents.loc[common_weeks]).sum()
+
+                # For weeks where these two teams played each other, it's a tie (team vs itself)
+                # Count ties as 0.5 wins
+                wins = 0.0
+                for week in common_weeks:
+                    team_score = team_scores.loc[week]
+                    opponent_score = schedule_opponents.loc[week]
+                    opponent_name = schedule_data[schedule_data["week"] == week][
+                        "opponent_owner"
+                    ].iloc[0]
+
+                    if opponent_name == team:
+                        # This week they played each other - count as tie (0.5 wins)
+                        wins += 0.5
+                    elif team_score > opponent_score:
+                        wins += 1.0
+
                 total_games = len(common_weeks)
                 losses = total_games - wins
                 win_pct = (wins / total_games * 100) if total_games > 0 else 0
