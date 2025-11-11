@@ -1094,7 +1094,7 @@ def main():
                 st.warning("No historical data available for records analysis.")
 
         with tab9:
-            st.header("Schedule Impact Analysis")
+            st.header(f"Schedule Impact Analysis ({config.year})")
             st.markdown(
                 """
                 Analyze how schedule luck affects team records. See what your record would be
@@ -1102,30 +1102,20 @@ def main():
                 """
             )
 
-            # Year selector - default to current year
-            selected_year = st.selectbox(
-                "Select Year",
-                options=list(range(config.year, 2005, -1)),
-                index=0,  # Default to current year (first option)
-                key="schedule_impact_year",
-            )
-
-            # Load historical matchup data for selected year only
+            # Load historical matchup data for current year only
             from gmb.taylor_eras import get_historical_matchups_with_opponents
 
             historical_df = get_historical_matchups_with_opponents(
                 league_id=config.league_id,
-                start_year=selected_year,
-                end_year=selected_year,
+                start_year=config.year,
+                end_year=config.year,
                 espn_s2=config.espn_s2,
                 swid=config.swid,
             )
 
             if historical_df is not None and not historical_df.empty:
                 # Calculate schedule swap records
-                swap_results = dashboard.calculate_schedule_swap_records(
-                    historical_df, selected_year
-                )
+                swap_results = dashboard.calculate_schedule_swap_records(historical_df, config.year)
 
                 if not swap_results.empty:
                     # Team selector
@@ -1145,7 +1135,7 @@ def main():
                     actual_losses = int(actual_record["actual_losses"])
 
                     # Display actual record
-                    st.subheader(f"{selected_team}'s Actual Record in {selected_year}")
+                    st.subheader(f"{selected_team}'s Actual Record")
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Wins", actual_wins)
@@ -1229,7 +1219,7 @@ def main():
                             f"{avg_wins - actual_wins:+.1f} vs actual",
                         )
                 else:
-                    st.warning(f"No data available for {selected_year}")
+                    st.warning(f"No data available for {config.year}")
             else:
                 st.warning("No historical data available for schedule analysis.")
 
