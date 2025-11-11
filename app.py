@@ -185,7 +185,7 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
             [
                 "📊 Overview",
                 "🤝 Head-to-Head Records",
@@ -194,6 +194,7 @@ def main():
                 "🎲 Keeper What-If",
                 "📋 Draft Analysis",
                 "✨ Taylor's Eras",
+                "🏆 Historical Records",
             ]
         )
 
@@ -867,6 +868,220 @@ def main():
                         f"No historical data available for years {start_year}-{end_year}. "
                         "This could be due to API access issues or the league not existing in those years."
                     )
+
+        with tab8:
+            st.subheader("🏆 Historical Records")
+
+            st.info(
+                "League records across all seasons. "
+                "These records include all games from the league's entire history."
+            )
+
+            # Cache historical data loading (reuse same function as H2H tab)
+            @st.cache_data(ttl=3600)
+            def load_records_historical_data(
+                league_id: int,
+                start_year: int,
+                end_year: int,
+                espn_s2: str | None,
+                swid: str | None,
+            ) -> pd.DataFrame:
+                """Load historical matchup data for records analysis."""
+                from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+                return get_historical_matchups_with_opponents(
+                    league_id, start_year, end_year, espn_s2, swid
+                )
+
+            # Get current year from config
+            year = config.year
+            start_year = 2006  # League inception
+            end_year = year
+
+            # Load historical matchup data
+            historical_df = load_records_historical_data(
+                league_id=config.league_id,
+                start_year=start_year,
+                end_year=end_year,
+                espn_s2=config.espn_s2,
+                swid=config.swid,
+            )
+
+            if not historical_df.empty:
+                # Section 1: Top 10 Single-Game Performances
+                st.markdown("### 🔥 Top 10 Single-Game Performances")
+                st.write("Highest scoring games by a single team in league history.")
+
+                # Add result column (W/L)
+                historical_df["result"] = historical_df.apply(
+                    lambda row: "W" if row["points"] > row["opponent_points"] else "L",
+                    axis=1,
+                )
+
+                # Sort by points and get top 10
+                top_games = (
+                    historical_df.nlargest(10, "points")[
+                        [
+                            "owner",
+                            "team_name",
+                            "points",
+                            "opponent_owner",
+                            "opponent_points",
+                            "week",
+                            "year",
+                            "result",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_games.index = top_games.index + 1  # Start rank at 1
+                top_games.index.name = "Rank"
+
+                # Format the dataframe
+                top_games.columns = [
+                    "Owner",
+                    "Team",
+                    "Points",
+                    "Opponent",
+                    "Opp Points",
+                    "Week",
+                    "Year",
+                    "Result",
+                ]
+
+                st.dataframe(top_games, use_container_width=True)
+
+                # Section 2: Top 10 Highest-Scoring Matchups
+                st.markdown("### 💥 Top 10 Highest-Scoring Matchups")
+                st.write("Games with the highest combined scores between two teams.")
+
+                # Calculate combined points and create matchup dataframe
+                matchups_combined = historical_df.copy()
+                matchups_combined["combined_points"] = (
+                    matchups_combined["points"] + matchups_combined["opponent_points"]
+                )
+
+                # Get unique matchups (avoid counting same matchup twice)
+                # Create a matchup ID by sorting owner names to group same matchup
+                matchups_combined["matchup_id"] = matchups_combined.apply(
+                    lambda row: f"{row['year']}-{row['week']}-"
+                    f"{'-'.join(sorted([row['owner'], row['opponent_owner']]))}",
+                    axis=1,
+                )
+
+                # Keep only one row per matchup (the first occurrence)
+                unique_matchups = matchups_combined.drop_duplicates(
+                    subset=["matchup_id"], keep="first"
+                )
+
+                top_matchups = (
+                    unique_matchups.nlargest(10, "combined_points")[
+                        [
+                            "combined_points",
+                            "owner",
+                            "points",
+                            "opponent_owner",
+                            "opponent_points",
+                            "week",
+                            "year",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_matchups.index = top_matchups.index + 1
+                top_matchups.index.name = "Rank"
+
+                # Format the dataframe
+                top_matchups.columns = [
+                    "Combined",
+                    "Owner 1",
+                    "Points 1",
+                    "Owner 2",
+                    "Points 2",
+                    "Week",
+                    "Year",
+                ]
+
+                st.dataframe(top_matchups, use_container_width=True)
+
+                # Section 3: Top 10 Single-Season Performances
+                st.markdown("### 📈 Top 10 Single-Season Performances")
+                st.write("Highest total points scored by an owner in a single season.")
+
+                # Group by owner and year to calculate season totals
+                season_stats = (
+                    historical_df.groupby(["owner", "year"])
+                    .agg(
+                        total_points=("points", "sum"),
+                        games_played=("points", "count"),
+                        wins=(
+                            "result",
+                            lambda x: (
+                                historical_df.loc[x.index, "points"]
+                                > historical_df.loc[x.index, "opponent_points"]
+                            ).sum(),
+                        ),
+                        losses=(
+                            "result",
+                            lambda x: (
+                                historical_df.loc[x.index, "points"]
+                                < historical_df.loc[x.index, "opponent_points"]
+                            ).sum(),
+                        ),
+                        team_name=("team_name", "first"),
+                    )
+                    .reset_index()
+                )
+
+                # Calculate average points per game
+                season_stats["avg_ppg"] = (
+                    season_stats["total_points"] / season_stats["games_played"]
+                )
+
+                # Create record string
+                season_stats["record"] = (
+                    season_stats["wins"].astype(str) + "-" + season_stats["losses"].astype(str)
+                )
+
+                # Get top 10 seasons
+                top_seasons = (
+                    season_stats.nlargest(10, "total_points")[
+                        [
+                            "owner",
+                            "team_name",
+                            "year",
+                            "total_points",
+                            "games_played",
+                            "avg_ppg",
+                            "record",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_seasons.index = top_seasons.index + 1
+                top_seasons.index.name = "Rank"
+
+                # Format the dataframe
+                top_seasons.columns = [
+                    "Owner",
+                    "Team",
+                    "Year",
+                    "Total Points",
+                    "Games",
+                    "Avg PPG",
+                    "Record",
+                ]
+
+                # Round avg_ppg to 1 decimal
+                top_seasons["Avg PPG"] = top_seasons["Avg PPG"].round(1)
+
+                st.dataframe(top_seasons, use_container_width=True)
+
+            else:
+                st.warning("No historical data available for records analysis.")
 
     except ValueError as e:
         st.error(f"Configuration Error: {e}")
