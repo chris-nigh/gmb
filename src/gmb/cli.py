@@ -672,6 +672,123 @@ def h2h(
         raise typer.Exit(1)
 
 
+@app.command()
+def win_pct_by_points(
+    year: int = typer.Option(None, help="Filter by specific year (default: all years)"),
+    output: str = typer.Option(
+        None, help="Output CSV file path (default: win_pct_by_points_<year>.csv)"
+    ),
+) -> None:
+    """Export winning percentage by points scored data for debugging.
+
+    Shows how win percentage relates to points scored, grouped into 5-point bins.
+    Useful for debugging the win % by points visualization.
+    """
+    import pandas as pd
+
+    try:
+        config = DashboardConfig.load()
+        rprint("[bold]Analyzing Winning Percentage by Points Scored[/bold]")
+        rprint(f"[dim]League ID: {config.league_id}[/dim]\n")
+
+        # Load historical data
+        from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+        # Set year range based on filter
+        if year is not None:
+            start_year = year
+            end_year = year
+            rprint(f"[yellow]Loading data for year {year}...[/yellow]")
+        else:
+            start_year = 2006
+            end_year = config.year
+            rprint(
+                f"[yellow]Loading historical matchup data ({end_year - start_year + 1} years)...[/yellow]"
+            )
+
+        historical_df = get_historical_matchups_with_opponents(
+            league_id=config.league_id,
+            start_year=start_year,
+            end_year=end_year,
+            espn_s2=config.espn_s2,
+            swid=config.swid,
+        )
+
+        if historical_df.empty:
+            rprint("[red]No historical data found[/red]")
+            raise typer.Exit(1)
+
+        # Add win indicator
+        historical_df["won"] = (historical_df["points"] > historical_df["opponent_points"]).astype(
+            int
+        )
+
+        # Create point bins (round to nearest 5)
+        historical_df["point_bin"] = (historical_df["points"] // 5) * 5
+
+        # Calculate win percentage for each point bin per year
+        results = []
+        for year_val in sorted(historical_df["year"].unique()):
+            year_data = historical_df[historical_df["year"] == year_val]
+
+            win_pct_by_points = (
+                year_data.groupby("point_bin")
+                .agg(
+                    games=("won", "count"),
+                    wins=("won", "sum"),
+                )
+                .reset_index()
+            )
+            win_pct_by_points["win_pct"] = (
+                win_pct_by_points["wins"] / win_pct_by_points["games"]
+            ) * 100
+            win_pct_by_points["year"] = year_val
+
+            results.append(win_pct_by_points)
+
+        # Combine all years
+        result_df = pd.concat(results, ignore_index=True)
+
+        # Sort by year and point_bin
+        result_df = result_df.sort_values(["year", "point_bin"])
+
+        # Determine output file
+        if output is None:
+            if year is not None:
+                output = f"win_pct_by_points_{year}.csv"
+            else:
+                output = "win_pct_by_points_all_years.csv"
+
+        # Save to CSV
+        result_df.to_csv(output, index=False)
+
+        rprint(f"[green]Data exported to: {output}[/green]\n")
+        rprint("[bold]Summary:[/bold]")
+        rprint(f"Total years: {result_df['year'].nunique()}")
+        rprint(f"Total point bins: {len(result_df)}")
+        rprint(f"Point range: {result_df['point_bin'].min()}-{result_df['point_bin'].max()}\n")
+
+        # Show sample data
+        rprint("[bold]Sample data (first 10 rows):[/bold]")
+        rprint(result_df.head(10).to_string(index=False))
+
+        if year is not None:
+            rprint(f"\n[bold]Full data for {year}:[/bold]")
+            year_df = result_df[result_df["year"] == year]
+            rprint(year_df.to_string(index=False))
+
+    except ValueError as e:
+        rprint(f"[red]Configuration Error: {e}[/red]")
+        rprint("[yellow]Run 'gmb setup' to configure your league settings[/yellow]")
+        raise typer.Exit(1)
+    except Exception as e:
+        rprint(f"[red]Error: {e}[/red]")
+        import traceback
+
+        rprint(f"[dim]{traceback.format_exc()}[/dim]")
+        raise typer.Exit(1)
+
+
 def main() -> None:
     """Main CLI entry point."""
     app()
