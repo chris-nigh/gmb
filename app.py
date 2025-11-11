@@ -1182,7 +1182,7 @@ def main():
 
                     styled_df = display_columns.style.apply(highlight_actual, axis=1)
 
-                    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True, height=460)
 
                     # Summary stats
                     st.subheader("Summary")
