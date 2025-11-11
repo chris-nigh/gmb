@@ -1152,9 +1152,22 @@ def main():
 
                     # Prepare display data
                     display_df = team_results.copy()
-                    display_df["record"] = (
-                        display_df["wins"].astype(str) + "-" + display_df["losses"].astype(str)
+
+                    # Calculate ties from fractional wins/losses
+                    # If wins = 3.5, that's 3 wins and 1 tie (0.5)
+                    display_df["wins_int"] = display_df["wins"].apply(lambda x: int(x))
+                    display_df["losses_int"] = display_df["losses"].apply(lambda x: int(x))
+                    display_df["ties"] = display_df["wins"].apply(
+                        lambda x: 1 if (x % 1) == 0.5 else 0
                     )
+
+                    # Format record as W-L-T (only show ties if > 0)
+                    def format_record(row: pd.Series) -> str:
+                        if row["ties"] > 0:
+                            return f"{row['wins_int']}-{row['losses_int']}-{row['ties']}"
+                        return f"{row['wins_int']}-{row['losses_int']}"
+
+                    display_df["record"] = display_df.apply(format_record, axis=1)
                     display_df["win_pct_formatted"] = display_df["win_pct"].apply(
                         lambda x: f"{x:.1f}%"
                     )
@@ -1188,26 +1201,42 @@ def main():
                     st.subheader("Summary")
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        best_wins = int(team_results["wins"].max())
-                        best_schedule = team_results[team_results["wins"] == best_wins][
-                            "schedule_from"
-                        ].iloc[0]
+                        best_row = team_results.loc[team_results["wins"].idxmax()]
+                        best_wins_float = best_row["wins"]
+                        best_wins = int(best_wins_float)
+                        best_losses = int(best_row["losses"])
+                        best_ties = 1 if (best_wins_float % 1) == 0.5 else 0
+                        best_schedule = best_row["schedule_from"]
+
+                        best_record = (
+                            f"{best_wins}-{best_losses}-{best_ties}"
+                            if best_ties > 0
+                            else f"{best_wins}-{best_losses}"
+                        )
                         st.metric(
                             "Best Possible Record",
-                            f"{best_wins}-{int(team_results['losses'].min())}",
-                            f"+{best_wins - actual_wins} wins vs actual",
+                            best_record,
+                            f"+{best_wins_float - actual_wins:.1f} wins vs actual",
                         )
                         st.caption(f"With {best_schedule}'s schedule")
 
                     with col2:
-                        worst_wins = int(team_results["wins"].min())
-                        worst_schedule = team_results[team_results["wins"] == worst_wins][
-                            "schedule_from"
-                        ].iloc[0]
+                        worst_row = team_results.loc[team_results["wins"].idxmin()]
+                        worst_wins_float = worst_row["wins"]
+                        worst_wins = int(worst_wins_float)
+                        worst_losses = int(worst_row["losses"])
+                        worst_ties = 1 if (worst_wins_float % 1) == 0.5 else 0
+                        worst_schedule = worst_row["schedule_from"]
+
+                        worst_record = (
+                            f"{worst_wins}-{worst_losses}-{worst_ties}"
+                            if worst_ties > 0
+                            else f"{worst_wins}-{worst_losses}"
+                        )
                         st.metric(
                             "Worst Possible Record",
-                            f"{worst_wins}-{int(team_results['losses'].max())}",
-                            f"{worst_wins - actual_wins} wins vs actual",
+                            worst_record,
+                            f"{worst_wins_float - actual_wins:.1f} wins vs actual",
                         )
                         st.caption(f"With {worst_schedule}'s schedule")
 
