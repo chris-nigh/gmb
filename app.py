@@ -185,7 +185,7 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
             [
                 "📊 Overview",
                 "🤝 Head-to-Head Records",
@@ -195,6 +195,7 @@ def main():
                 "📋 Draft Analysis",
                 "✨ Taylor's Eras",
                 "🏆 Historical Records",
+                "📅 Schedule Impact",
             ]
         )
 
@@ -1091,6 +1092,145 @@ def main():
 
             else:
                 st.warning("No historical data available for records analysis.")
+
+        with tab9:
+            st.header("Schedule Impact Analysis")
+            st.markdown(
+                """
+                Analyze how schedule luck affects team records. See what your record would be
+                if you had faced a different team's opponents.
+                """
+            )
+
+            # Year selector
+            selected_year = st.selectbox(
+                "Select Year",
+                options=list(range(config.year, 2005, -1)),
+                key="schedule_impact_year",
+            )
+
+            # Load historical matchup data for selected year
+            from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+            historical_df = get_historical_matchups_with_opponents(
+                league_id=config.league_id,
+                start_year=2006,
+                end_year=config.year,
+                espn_s2=config.espn_s2,
+                swid=config.swid,
+            )
+
+            if historical_df is not None and not historical_df.empty:
+                # Calculate schedule swap records
+                swap_results = dashboard.calculate_schedule_swap_records(
+                    historical_df, selected_year
+                )
+
+                if not swap_results.empty:
+                    # Team selector
+                    teams = sorted(swap_results["team"].unique())
+                    selected_team = st.selectbox(
+                        "Select Team",
+                        options=teams,
+                        key="schedule_impact_team",
+                    )
+
+                    # Filter to selected team's results
+                    team_results = swap_results[swap_results["team"] == selected_team].copy()
+
+                    # Get actual record for comparison
+                    actual_record = team_results[team_results["is_actual"]].iloc[0]
+                    actual_wins = int(actual_record["actual_wins"])
+                    actual_losses = int(actual_record["actual_losses"])
+
+                    # Display actual record
+                    st.subheader(f"{selected_team}'s Actual Record in {selected_year}")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Wins", actual_wins)
+                    with col2:
+                        st.metric("Losses", actual_losses)
+                    with col3:
+                        st.metric("Win %", f"{actual_record['win_pct']:.1f}%")
+
+                    # Show alternative schedule results
+                    st.subheader("Record with Each Team's Schedule")
+                    st.markdown(
+                        f"What would **{selected_team}**'s record be with each team's schedule?"
+                    )
+
+                    # Prepare display data
+                    display_df = team_results.copy()
+                    display_df["record"] = (
+                        display_df["wins"].astype(str) + "-" + display_df["losses"].astype(str)
+                    )
+                    display_df["win_pct_formatted"] = display_df["win_pct"].apply(
+                        lambda x: f"{x:.1f}%"
+                    )
+                    display_df["diff_wins"] = display_df["wins"] - actual_wins
+
+                    # Sort by wins descending
+                    display_df = display_df.sort_values("wins", ascending=False)
+
+                    # Select columns for display
+                    display_columns = display_df[
+                        ["schedule_from", "record", "win_pct_formatted", "diff_wins"]
+                    ].copy()
+                    display_columns.columns = [
+                        "Schedule From",
+                        "Record",
+                        "Win %",
+                        "Wins vs Actual",
+                    ]
+
+                    # Highlight actual schedule
+                    def highlight_actual(row: pd.Series) -> list[str]:
+                        if row["Schedule From"] == selected_team:
+                            return ["background-color: #E8F5E9"] * len(row)
+                        return [""] * len(row)
+
+                    styled_df = display_columns.style.apply(highlight_actual, axis=1)
+
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
+                    # Summary stats
+                    st.subheader("Summary")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        best_wins = int(team_results["wins"].max())
+                        best_schedule = team_results[team_results["wins"] == best_wins][
+                            "schedule_from"
+                        ].iloc[0]
+                        st.metric(
+                            "Best Possible Record",
+                            f"{best_wins}-{int(team_results['losses'].min())}",
+                            f"+{best_wins - actual_wins} wins vs actual",
+                        )
+                        st.caption(f"With {best_schedule}'s schedule")
+
+                    with col2:
+                        worst_wins = int(team_results["wins"].min())
+                        worst_schedule = team_results[team_results["wins"] == worst_wins][
+                            "schedule_from"
+                        ].iloc[0]
+                        st.metric(
+                            "Worst Possible Record",
+                            f"{worst_wins}-{int(team_results['losses'].max())}",
+                            f"{worst_wins - actual_wins} wins vs actual",
+                        )
+                        st.caption(f"With {worst_schedule}'s schedule")
+
+                    with col3:
+                        avg_wins = team_results["wins"].mean()
+                        st.metric(
+                            "Average Wins",
+                            f"{avg_wins:.1f}",
+                            f"{avg_wins - actual_wins:+.1f} vs actual",
+                        )
+                else:
+                    st.warning(f"No data available for {selected_year}")
+            else:
+                st.warning("No historical data available for schedule analysis.")
 
     except ValueError as e:
         st.error(f"Configuration Error: {e}")

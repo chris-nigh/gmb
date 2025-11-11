@@ -1496,3 +1496,69 @@ class FantasyDashboard:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+    def calculate_schedule_swap_records(
+        self, historical_matchups: pd.DataFrame, year: int
+    ) -> pd.DataFrame:
+        """Calculate what each team's record would be with every other team's schedule.
+
+        Args:
+            historical_matchups: DataFrame with matchup data
+            year: Year to analyze
+
+        Returns:
+            DataFrame with columns: team, schedule_from, wins, losses, win_pct, actual_wins, actual_losses
+        """
+        year_data = historical_matchups[historical_matchups["year"] == year].copy()
+
+        if year_data.empty:
+            return pd.DataFrame()
+
+        # Get all unique owners
+        owners = sorted(year_data["owner"].unique())
+
+        results = []
+        for team in owners:
+            # Get this team's scores by week
+            team_scores = (
+                year_data[year_data["owner"] == team][["week", "points"]]
+                .sort_values("week")
+                .set_index("week")["points"]
+            )
+
+            # Calculate actual record
+            actual_matchups = year_data[year_data["owner"] == team]
+            actual_wins = (actual_matchups["points"] > actual_matchups["opponent_points"]).sum()
+            actual_losses = len(actual_matchups) - actual_wins
+
+            # For each other team's schedule
+            for schedule_owner in owners:
+                # Get the opponents this schedule faced (by week)
+                schedule_opponents = (
+                    year_data[year_data["owner"] == schedule_owner][["week", "opponent_points"]]
+                    .sort_values("week")
+                    .set_index("week")["opponent_points"]
+                )
+
+                # Calculate wins with this schedule
+                # (team's scores vs schedule's opponents, matched by week)
+                common_weeks = team_scores.index.intersection(schedule_opponents.index)
+                wins = (team_scores.loc[common_weeks] > schedule_opponents.loc[common_weeks]).sum()
+                total_games = len(common_weeks)
+                losses = total_games - wins
+                win_pct = (wins / total_games * 100) if total_games > 0 else 0
+
+                results.append(
+                    {
+                        "team": team,
+                        "schedule_from": schedule_owner,
+                        "wins": wins,
+                        "losses": losses,
+                        "win_pct": win_pct,
+                        "actual_wins": actual_wins,
+                        "actual_losses": actual_losses,
+                        "is_actual": team == schedule_owner,
+                    }
+                )
+
+        return pd.DataFrame(results)
