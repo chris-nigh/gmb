@@ -681,8 +681,8 @@ def win_pct_by_points(
 ) -> None:
     """Export winning percentage by points scored data for debugging.
 
-    Shows how win percentage relates to points scored, grouped into 5-point bins.
-    Useful for debugging the win % by points visualization.
+    For each threshold X, calculates win % for teams that scored X+ points.
+    Shows: of all teams that scored X or more points, what % won their matchup?
     """
     import pandas as pd
 
@@ -723,34 +723,38 @@ def win_pct_by_points(
             int
         )
 
-        # Create point bins (round to nearest 5)
-        historical_df["point_bin"] = (historical_df["points"] // 5) * 5
-
-        # Calculate win percentage for each point bin per year
+        # Calculate win percentage for teams scoring X+ points (threshold-based)
         results = []
         for year_val in sorted(historical_df["year"].unique()):
-            year_data = historical_df[historical_df["year"] == year_val]
+            year_data = historical_df[historical_df["year"] == year_val].copy()
 
-            win_pct_by_points = (
-                year_data.groupby("point_bin")
-                .agg(
-                    games=("won", "count"),
-                    wins=("won", "sum"),
-                )
-                .reset_index()
-            )
-            win_pct_by_points["win_pct"] = (
-                win_pct_by_points["wins"] / win_pct_by_points["games"]
-            ) * 100
-            win_pct_by_points["year"] = year_val
+            # Get range of point thresholds (every 5 points)
+            min_points = int(year_data["points"].min() // 5) * 5
+            max_points = int(year_data["points"].max() // 5) * 5
 
-            results.append(win_pct_by_points)
+            for threshold in range(min_points, max_points + 5, 5):
+                games_at_threshold = year_data[year_data["points"] >= threshold]
+
+                if len(games_at_threshold) > 0:
+                    wins = games_at_threshold["won"].sum()
+                    total = len(games_at_threshold)
+                    win_pct = (wins / total) * 100
+
+                    results.append(
+                        {
+                            "year": year_val,
+                            "threshold": threshold,
+                            "games": total,
+                            "wins": wins,
+                            "win_pct": win_pct,
+                        }
+                    )
 
         # Combine all years
-        result_df = pd.concat(results, ignore_index=True)
+        result_df = pd.DataFrame(results)
 
-        # Sort by year and point_bin
-        result_df = result_df.sort_values(["year", "point_bin"])
+        # Sort by year and threshold
+        result_df = result_df.sort_values(["year", "threshold"])
 
         # Determine output file
         if output is None:
@@ -765,8 +769,8 @@ def win_pct_by_points(
         rprint(f"[green]Data exported to: {output}[/green]\n")
         rprint("[bold]Summary:[/bold]")
         rprint(f"Total years: {result_df['year'].nunique()}")
-        rprint(f"Total point bins: {len(result_df)}")
-        rprint(f"Point range: {result_df['point_bin'].min()}-{result_df['point_bin'].max()}\n")
+        rprint(f"Total thresholds: {len(result_df)}")
+        rprint(f"Point range: {result_df['threshold'].min()}-{result_df['threshold'].max()}\n")
 
         # Show sample data
         rprint("[bold]Sample data (first 10 rows):[/bold]")

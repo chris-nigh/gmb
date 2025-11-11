@@ -1398,8 +1398,10 @@ class FantasyDashboard:
             st.warning("No historical matchup data available for this analysis.")
             return
 
-        # Add win indicator
+        # Create a copy for processing
         historical_matchups = historical_matchups.copy()
+
+        # Add win indicator
         historical_matchups["won"] = (
             historical_matchups["points"] > historical_matchups["opponent_points"]
         ).astype(int)
@@ -1426,39 +1428,38 @@ class FantasyDashboard:
         for idx, year in enumerate(years):
             year_data = historical_matchups[historical_matchups["year"] == year].copy()
 
-            # Create point bins (round to nearest 5)
-            year_data["point_bin"] = (year_data["points"] // 5) * 5
+            # Get range of point thresholds (every 5 points)
+            min_points = int(year_data["points"].min() // 5) * 5
+            max_points = int(year_data["points"].max() // 5) * 5
 
-            # Calculate win percentage for each point bin
-            win_pct_by_points = (
-                year_data.groupby("point_bin")
-                .agg(
-                    games=("won", "count"),
-                    wins=("won", "sum"),
-                )
-                .reset_index()
-            )
-            win_pct_by_points["win_pct"] = (
-                win_pct_by_points["wins"] / win_pct_by_points["games"]
-            ) * 100
+            threshold_results = []
+            for threshold in range(min_points, max_points + 5, 5):
+                games_at_threshold = year_data[year_data["points"] >= threshold]
 
-            # Filter to bins with at least 3 games for statistical relevance
-            win_pct_by_points = win_pct_by_points[win_pct_by_points["games"] >= 3]
+                if len(games_at_threshold) > 0:
+                    wins = games_at_threshold["won"].sum()
+                    total = len(games_at_threshold)
+                    win_pct = (wins / total) * 100
 
-            # Sort by points for smooth line
-            win_pct_by_points = win_pct_by_points.sort_values("point_bin")
+                    threshold_results.append({"threshold": threshold, "win_pct": win_pct})
+
+            # Convert to DataFrame
+            win_pct_by_threshold = pd.DataFrame(threshold_results)
+
+            if win_pct_by_threshold.empty:
+                continue
 
             # Add trace for this year
             fig.add_trace(
                 go.Scatter(
-                    x=win_pct_by_points["point_bin"],
-                    y=win_pct_by_points["win_pct"],
+                    x=win_pct_by_threshold["threshold"],
+                    y=win_pct_by_threshold["win_pct"],
                     mode="lines+markers",
                     name=str(year),
                     line=dict(width=2, color=colors[idx % len(colors)]),
                     marker=dict(size=6),
                     hovertemplate="<b>%{fullData.name}</b><br>"
-                    + "Points: %{x}<br>"
+                    + "Points: %{x}+<br>"
                     + "Win %: %{y:.1f}%<br>"
                     + "<extra></extra>",
                 )
@@ -1466,8 +1467,8 @@ class FantasyDashboard:
 
         # Update layout
         fig.update_layout(
-            title="Winning Percentage by Points Scored (Per Year)",
-            xaxis_title="Points Scored",
+            title="Winning Percentage for Teams Scoring X+ Points (Per Year)",
+            xaxis_title="Points Scored (Threshold)",
             yaxis_title="Winning Percentage (%)",
             plot_bgcolor="#FAFAF8",
             paper_bgcolor="#FAFAF8",
