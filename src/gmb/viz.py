@@ -1385,3 +1385,195 @@ class FantasyDashboard:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+    def create_win_pct_by_points_chart(
+        self, historical_matchups: pd.DataFrame | None = None
+    ) -> None:
+        """Create chart showing winning percentage by points scored, with one line per year.
+
+        Args:
+            historical_matchups: DataFrame with historical matchup data including year, points, and opponent_points
+        """
+        if historical_matchups is None or historical_matchups.empty:
+            st.warning("No historical matchup data available for this analysis.")
+            return
+
+        # Create a copy for processing
+        historical_matchups = historical_matchups.copy()
+
+        # Add win indicator
+        historical_matchups["won"] = (
+            historical_matchups["points"] > historical_matchups["opponent_points"]
+        ).astype(int)
+
+        # Get all unique years
+        years = sorted(historical_matchups["year"].unique())
+
+        # Create figure
+        fig = go.Figure()
+
+        # Color palette - use Vermont theme colors cycling through years
+        colors = [
+            "#2D5F3F",  # Forest green
+            "#4A7C59",  # Sage green
+            "#8B4513",  # Saddle brown
+            "#CD853F",  # Peru
+            "#6B8E23",  # Olive drab
+            "#556B2F",  # Dark olive green
+            "#8FBC8F",  # Dark sea green
+            "#A0522D",  # Sienna
+        ]
+
+        # Process each year
+        for idx, year in enumerate(years):
+            year_data = historical_matchups[historical_matchups["year"] == year].copy()
+
+            # Get range of point thresholds (every 5 points)
+            min_points = int(year_data["points"].min() // 5) * 5
+            max_points = int(year_data["points"].max() // 5) * 5
+
+            threshold_results = []
+            for threshold in range(min_points, max_points + 5, 5):
+                games_at_threshold = year_data[year_data["points"] >= threshold]
+
+                if len(games_at_threshold) > 0:
+                    wins = games_at_threshold["won"].sum()
+                    total = len(games_at_threshold)
+                    win_pct = (wins / total) * 100
+
+                    threshold_results.append({"threshold": threshold, "win_pct": win_pct})
+
+            # Convert to DataFrame
+            win_pct_by_threshold = pd.DataFrame(threshold_results)
+
+            if win_pct_by_threshold.empty:
+                continue
+
+            # Add trace for this year
+            fig.add_trace(
+                go.Scatter(
+                    x=win_pct_by_threshold["threshold"],
+                    y=win_pct_by_threshold["win_pct"],
+                    mode="lines+markers",
+                    name=str(year),
+                    line=dict(width=2, color=colors[idx % len(colors)]),
+                    marker=dict(size=6),
+                    hovertemplate="<b>%{fullData.name}</b><br>"
+                    + "Points: %{x}+<br>"
+                    + "Win %: %{y:.1f}%<br>"
+                    + "<extra></extra>",
+                )
+            )
+
+        # Update layout
+        fig.update_layout(
+            title="Winning Percentage for Teams Scoring X+ Points (Per Year)",
+            xaxis_title="Points Scored (Threshold)",
+            yaxis_title="Winning Percentage (%)",
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            hovermode="closest",
+            showlegend=True,
+            legend=dict(
+                title="Year",
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+            ),
+            xaxis=dict(
+                gridcolor="#E8E5DC",
+                showgrid=True,
+                zeroline=False,
+            ),
+            yaxis=dict(
+                gridcolor="#E8E5DC",
+                showgrid=True,
+                zeroline=False,
+                range=[0, 105],  # Show 0-100% with slight padding
+            ),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    def calculate_schedule_swap_records(
+        self, historical_matchups: pd.DataFrame, year: int
+    ) -> pd.DataFrame:
+        """Calculate what each team's record would be with every other team's schedule.
+
+        Args:
+            historical_matchups: DataFrame with matchup data
+            year: Year to analyze
+
+        Returns:
+            DataFrame with columns: team, schedule_from, wins, losses, win_pct, actual_wins, actual_losses
+        """
+        year_data = historical_matchups[historical_matchups["year"] == year].copy()
+
+        if year_data.empty:
+            return pd.DataFrame()
+
+        # Get all unique owners
+        owners = sorted(year_data["owner"].unique())
+
+        results = []
+        for team in owners:
+            # Get this team's scores by week
+            team_scores = (
+                year_data[year_data["owner"] == team][["week", "points"]]
+                .sort_values("week")
+                .set_index("week")["points"]
+            )
+
+            # Calculate actual record
+            actual_matchups = year_data[year_data["owner"] == team]
+            actual_wins = (actual_matchups["points"] > actual_matchups["opponent_points"]).sum()
+            actual_losses = len(actual_matchups) - actual_wins
+
+            # For each other team's schedule
+            for schedule_owner in owners:
+                # Get the schedule: weeks and opponent scores
+                schedule_data = year_data[year_data["owner"] == schedule_owner][
+                    ["week", "opponent_points", "opponent_owner"]
+                ].sort_values("week")
+                schedule_opponents = schedule_data.set_index("week")["opponent_points"]
+
+                # Calculate wins with this schedule
+                # (team's scores vs schedule's opponents, matched by week)
+                common_weeks = team_scores.index.intersection(schedule_opponents.index)
+
+                # For weeks where these two teams played each other, it's a tie (team vs itself)
+                # Count ties as 0.5 wins
+                wins = 0.0
+                for week in common_weeks:
+                    team_score = team_scores.loc[week]
+                    opponent_score = schedule_opponents.loc[week]
+                    opponent_name = schedule_data[schedule_data["week"] == week][
+                        "opponent_owner"
+                    ].iloc[0]
+
+                    if opponent_name == team:
+                        # This week they played each other - count as tie (0.5 wins)
+                        wins += 0.5
+                    elif team_score > opponent_score:
+                        wins += 1.0
+
+                total_games = len(common_weeks)
+                losses = total_games - wins
+                win_pct = (wins / total_games * 100) if total_games > 0 else 0
+
+                results.append(
+                    {
+                        "team": team,
+                        "schedule_from": schedule_owner,
+                        "wins": wins,
+                        "losses": losses,
+                        "win_pct": win_pct,
+                        "actual_wins": actual_wins,
+                        "actual_losses": actual_losses,
+                        "is_actual": team == schedule_owner,
+                    }
+                )
+
+        return pd.DataFrame(results)

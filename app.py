@@ -185,7 +185,7 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
             [
                 "📊 Overview",
                 "🤝 Head-to-Head Records",
@@ -194,6 +194,8 @@ def main():
                 "🎲 Keeper What-If",
                 "📋 Draft Analysis",
                 "✨ Taylor's Eras",
+                "🏆 Historical Records",
+                "📅 Schedule Impact",
             ]
         )
 
@@ -867,6 +869,388 @@ def main():
                         f"No historical data available for years {start_year}-{end_year}. "
                         "This could be due to API access issues or the league not existing in those years."
                     )
+
+        with tab8:
+            st.subheader("🏆 Historical Records")
+
+            st.info(
+                "League records across all seasons. "
+                "These records include all games from the league's entire history."
+            )
+
+            # Cache historical data loading (reuse same function as H2H tab)
+            @st.cache_data(ttl=3600)
+            def load_records_historical_data(
+                league_id: int,
+                start_year: int,
+                end_year: int,
+                espn_s2: str | None,
+                swid: str | None,
+            ) -> pd.DataFrame:
+                """Load historical matchup data for records analysis."""
+                from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+                return get_historical_matchups_with_opponents(
+                    league_id, start_year, end_year, espn_s2, swid
+                )
+
+            # Get current year from config
+            year = config.year
+            start_year = 2006  # League inception
+            end_year = year
+
+            # Load historical matchup data
+            historical_df = load_records_historical_data(
+                league_id=config.league_id,
+                start_year=start_year,
+                end_year=end_year,
+                espn_s2=config.espn_s2,
+                swid=config.swid,
+            )
+
+            if not historical_df.empty:
+                # Section 1: Top 10 Single-Game Performances
+                st.markdown("### 🔥 Top 10 Single-Game Performances")
+                st.write("Highest scoring games by a single team in league history.")
+
+                # Add result column (W/L)
+                historical_df["result"] = historical_df.apply(
+                    lambda row: "W" if row["points"] > row["opponent_points"] else "L",
+                    axis=1,
+                )
+
+                # Sort by points and get top 10
+                top_games = (
+                    historical_df.nlargest(10, "points")[
+                        [
+                            "owner",
+                            "team_name",
+                            "points",
+                            "opponent_owner",
+                            "opponent_points",
+                            "week",
+                            "year",
+                            "result",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_games.index = top_games.index + 1  # Start rank at 1
+                top_games.index.name = "Rank"
+
+                # Format the dataframe
+                top_games.columns = [
+                    "Owner",
+                    "Team",
+                    "Points",
+                    "Opponent",
+                    "Opp Points",
+                    "Week",
+                    "Year",
+                    "Result",
+                ]
+
+                st.dataframe(top_games, use_container_width=True)
+
+                # Section 2: Top 10 Highest-Scoring Matchups
+                st.markdown("### 💥 Top 10 Highest-Scoring Matchups")
+                st.write("Games with the highest combined scores between two teams.")
+
+                # Calculate combined points and create matchup dataframe
+                matchups_combined = historical_df.copy()
+                matchups_combined["combined_points"] = (
+                    matchups_combined["points"] + matchups_combined["opponent_points"]
+                )
+
+                # Get unique matchups (avoid counting same matchup twice)
+                # Create a matchup ID by sorting owner names to group same matchup
+                matchups_combined["matchup_id"] = matchups_combined.apply(
+                    lambda row: f"{row['year']}-{row['week']}-"
+                    f"{'-'.join(sorted([row['owner'], row['opponent_owner']]))}",
+                    axis=1,
+                )
+
+                # Keep only one row per matchup (the first occurrence)
+                unique_matchups = matchups_combined.drop_duplicates(
+                    subset=["matchup_id"], keep="first"
+                )
+
+                top_matchups = (
+                    unique_matchups.nlargest(10, "combined_points")[
+                        [
+                            "combined_points",
+                            "owner",
+                            "points",
+                            "opponent_owner",
+                            "opponent_points",
+                            "week",
+                            "year",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_matchups.index = top_matchups.index + 1
+                top_matchups.index.name = "Rank"
+
+                # Format the dataframe
+                top_matchups.columns = [
+                    "Combined",
+                    "Owner 1",
+                    "Points 1",
+                    "Owner 2",
+                    "Points 2",
+                    "Week",
+                    "Year",
+                ]
+
+                st.dataframe(top_matchups, use_container_width=True)
+
+                # Section 3: Top 10 Single-Season Performances
+                st.markdown("### 📈 Top 10 Single-Season Performances")
+                st.write("Highest total points scored by an owner in a single season.")
+
+                # Group by owner and year to calculate season totals
+                season_stats = (
+                    historical_df.groupby(["owner", "year"])
+                    .agg(
+                        total_points=("points", "sum"),
+                        games_played=("points", "count"),
+                        wins=(
+                            "result",
+                            lambda x: (
+                                historical_df.loc[x.index, "points"]
+                                > historical_df.loc[x.index, "opponent_points"]
+                            ).sum(),
+                        ),
+                        losses=(
+                            "result",
+                            lambda x: (
+                                historical_df.loc[x.index, "points"]
+                                < historical_df.loc[x.index, "opponent_points"]
+                            ).sum(),
+                        ),
+                        team_name=("team_name", "first"),
+                    )
+                    .reset_index()
+                )
+
+                # Calculate average points per game
+                season_stats["avg_ppg"] = (
+                    season_stats["total_points"] / season_stats["games_played"]
+                )
+
+                # Create record string
+                season_stats["record"] = (
+                    season_stats["wins"].astype(str) + "-" + season_stats["losses"].astype(str)
+                )
+
+                # Get top 10 seasons
+                top_seasons = (
+                    season_stats.nlargest(10, "total_points")[
+                        [
+                            "owner",
+                            "team_name",
+                            "year",
+                            "total_points",
+                            "games_played",
+                            "avg_ppg",
+                            "record",
+                        ]
+                    ]
+                    .reset_index(drop=True)
+                    .copy()
+                )
+                top_seasons.index = top_seasons.index + 1
+                top_seasons.index.name = "Rank"
+
+                # Format the dataframe
+                top_seasons.columns = [
+                    "Owner",
+                    "Team",
+                    "Year",
+                    "Total Points",
+                    "Games",
+                    "Avg PPG",
+                    "Record",
+                ]
+
+                # Round avg_ppg to 1 decimal
+                top_seasons["Avg PPG"] = top_seasons["Avg PPG"].round(1)
+
+                st.dataframe(top_seasons, use_container_width=True)
+
+                # Section 4: Winning Percentage by Points Scored
+                st.markdown("### 📊 Winning Percentage by Points Scored")
+                st.write(
+                    "How likely is a team to win based on their score? "
+                    "Each line represents a different year, showing the relationship between points scored and winning percentage."
+                )
+
+                dashboard.create_win_pct_by_points_chart(historical_df)
+
+            else:
+                st.warning("No historical data available for records analysis.")
+
+        with tab9:
+            st.header(f"Schedule Impact Analysis ({config.year})")
+            st.markdown(
+                """
+                Analyze how schedule luck affects team records. See what your record would be
+                if you had faced a different team's opponents.
+                """
+            )
+
+            # Load historical matchup data for current year only
+            from gmb.taylor_eras import get_historical_matchups_with_opponents
+
+            historical_df = get_historical_matchups_with_opponents(
+                league_id=config.league_id,
+                start_year=config.year,
+                end_year=config.year,
+                espn_s2=config.espn_s2,
+                swid=config.swid,
+            )
+
+            if historical_df is not None and not historical_df.empty:
+                # Calculate schedule swap records
+                swap_results = dashboard.calculate_schedule_swap_records(historical_df, config.year)
+
+                if not swap_results.empty:
+                    # Team selector
+                    teams = sorted(swap_results["team"].unique())
+                    selected_team = st.selectbox(
+                        "Select Team",
+                        options=teams,
+                        key="schedule_impact_team",
+                    )
+
+                    # Filter to selected team's results
+                    team_results = swap_results[swap_results["team"] == selected_team].copy()
+
+                    # Get actual record for comparison
+                    actual_record = team_results[team_results["is_actual"]].iloc[0]
+                    actual_wins = int(actual_record["actual_wins"])
+                    actual_losses = int(actual_record["actual_losses"])
+
+                    # Display actual record
+                    st.subheader(f"{selected_team}'s Actual Record")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Wins", actual_wins)
+                    with col2:
+                        st.metric("Losses", actual_losses)
+                    with col3:
+                        st.metric("Win %", f"{actual_record['win_pct']:.1f}%")
+
+                    # Show alternative schedule results
+                    st.subheader("Record with Each Team's Schedule")
+                    st.markdown(
+                        f"What would **{selected_team}**'s record be with each team's schedule?"
+                    )
+
+                    # Prepare display data
+                    display_df = team_results.copy()
+
+                    # Calculate ties from fractional wins/losses
+                    # If wins = 3.5, that's 3 wins and 1 tie (0.5)
+                    display_df["wins_int"] = display_df["wins"].apply(lambda x: int(x))
+                    display_df["losses_int"] = display_df["losses"].apply(lambda x: int(x))
+                    display_df["ties"] = display_df["wins"].apply(
+                        lambda x: 1 if (x % 1) == 0.5 else 0
+                    )
+
+                    # Format record as W-L-T (only show ties if > 0)
+                    def format_record(row: pd.Series) -> str:
+                        if row["ties"] > 0:
+                            return f"{row['wins_int']}-{row['losses_int']}-{row['ties']}"
+                        return f"{row['wins_int']}-{row['losses_int']}"
+
+                    display_df["record"] = display_df.apply(format_record, axis=1)
+                    display_df["win_pct_formatted"] = display_df["win_pct"].apply(
+                        lambda x: f"{x:.1f}%"
+                    )
+                    display_df["diff_wins"] = display_df["wins"] - actual_wins
+
+                    # Sort by wins descending
+                    display_df = display_df.sort_values("wins", ascending=False)
+
+                    # Select columns for display
+                    display_columns = display_df[
+                        ["schedule_from", "record", "win_pct_formatted", "diff_wins"]
+                    ].copy()
+                    display_columns.columns = [
+                        "Schedule From",
+                        "Record",
+                        "Win %",
+                        "Wins vs Actual",
+                    ]
+
+                    # Highlight actual schedule
+                    def highlight_actual(row: pd.Series) -> list[str]:
+                        if row["Schedule From"] == selected_team:
+                            return ["background-color: #E8F5E9"] * len(row)
+                        return [""] * len(row)
+
+                    styled_df = display_columns.style.apply(highlight_actual, axis=1)
+
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True, height=460)
+
+                    # Summary stats
+                    st.subheader("Summary")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        best_row = team_results.loc[team_results["wins"].idxmax()]
+                        best_wins_float = best_row["wins"]
+                        best_wins = int(best_wins_float)
+                        best_losses = int(best_row["losses"])
+                        best_ties = 1 if (best_wins_float % 1) == 0.5 else 0
+                        best_schedule = best_row["schedule_from"]
+
+                        best_record = (
+                            f"{best_wins}-{best_losses}-{best_ties}"
+                            if best_ties > 0
+                            else f"{best_wins}-{best_losses}"
+                        )
+                        st.metric(
+                            "Best Possible Record",
+                            best_record,
+                            f"+{best_wins_float - actual_wins:.1f} wins vs actual",
+                        )
+                        st.caption(f"With {best_schedule}'s schedule")
+
+                    with col2:
+                        worst_row = team_results.loc[team_results["wins"].idxmin()]
+                        worst_wins_float = worst_row["wins"]
+                        worst_wins = int(worst_wins_float)
+                        worst_losses = int(worst_row["losses"])
+                        worst_ties = 1 if (worst_wins_float % 1) == 0.5 else 0
+                        worst_schedule = worst_row["schedule_from"]
+
+                        worst_record = (
+                            f"{worst_wins}-{worst_losses}-{worst_ties}"
+                            if worst_ties > 0
+                            else f"{worst_wins}-{worst_losses}"
+                        )
+                        st.metric(
+                            "Worst Possible Record",
+                            worst_record,
+                            f"{worst_wins_float - actual_wins:.1f} wins vs actual",
+                        )
+                        st.caption(f"With {worst_schedule}'s schedule")
+
+                    with col3:
+                        avg_wins = team_results["wins"].mean()
+                        st.metric(
+                            "Average Wins",
+                            f"{avg_wins:.1f}",
+                            f"{avg_wins - actual_wins:+.1f} vs actual",
+                        )
+                else:
+                    st.warning(f"No data available for {config.year}")
+            else:
+                st.warning("No historical data available for schedule analysis.")
 
     except ValueError as e:
         st.error(f"Configuration Error: {e}")
