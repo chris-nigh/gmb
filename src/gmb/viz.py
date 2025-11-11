@@ -1385,3 +1385,113 @@ class FantasyDashboard:
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+    def create_win_pct_by_points_chart(
+        self, historical_matchups: pd.DataFrame | None = None
+    ) -> None:
+        """Create chart showing winning percentage by points scored, with one line per year.
+
+        Args:
+            historical_matchups: DataFrame with historical matchup data including year, points, and opponent_points
+        """
+        if historical_matchups is None or historical_matchups.empty:
+            st.warning("No historical matchup data available for this analysis.")
+            return
+
+        # Add win indicator
+        historical_matchups = historical_matchups.copy()
+        historical_matchups["won"] = (
+            historical_matchups["points"] > historical_matchups["opponent_points"]
+        ).astype(int)
+
+        # Get all unique years
+        years = sorted(historical_matchups["year"].unique())
+
+        # Create figure
+        fig = go.Figure()
+
+        # Color palette - use Vermont theme colors cycling through years
+        colors = [
+            "#2D5F3F",  # Forest green
+            "#4A7C59",  # Sage green
+            "#8B4513",  # Saddle brown
+            "#CD853F",  # Peru
+            "#6B8E23",  # Olive drab
+            "#556B2F",  # Dark olive green
+            "#8FBC8F",  # Dark sea green
+            "#A0522D",  # Sienna
+        ]
+
+        # Process each year
+        for idx, year in enumerate(years):
+            year_data = historical_matchups[historical_matchups["year"] == year].copy()
+
+            # Create point bins (round to nearest 5)
+            year_data["point_bin"] = (year_data["points"] // 5) * 5
+
+            # Calculate win percentage for each point bin
+            win_pct_by_points = (
+                year_data.groupby("point_bin")
+                .agg(
+                    games=("won", "count"),
+                    wins=("won", "sum"),
+                )
+                .reset_index()
+            )
+            win_pct_by_points["win_pct"] = (
+                win_pct_by_points["wins"] / win_pct_by_points["games"]
+            ) * 100
+
+            # Filter to bins with at least 3 games for statistical relevance
+            win_pct_by_points = win_pct_by_points[win_pct_by_points["games"] >= 3]
+
+            # Sort by points for smooth line
+            win_pct_by_points = win_pct_by_points.sort_values("point_bin")
+
+            # Add trace for this year
+            fig.add_trace(
+                go.Scatter(
+                    x=win_pct_by_points["point_bin"],
+                    y=win_pct_by_points["win_pct"],
+                    mode="lines+markers",
+                    name=str(year),
+                    line=dict(width=2, color=colors[idx % len(colors)]),
+                    marker=dict(size=6),
+                    hovertemplate="<b>%{fullData.name}</b><br>"
+                    + "Points: %{x}<br>"
+                    + "Win %: %{y:.1f}%<br>"
+                    + "<extra></extra>",
+                )
+            )
+
+        # Update layout
+        fig.update_layout(
+            title="Winning Percentage by Points Scored (Per Year)",
+            xaxis_title="Points Scored",
+            yaxis_title="Winning Percentage (%)",
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            hovermode="closest",
+            showlegend=True,
+            legend=dict(
+                title="Year",
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+            ),
+            xaxis=dict(
+                gridcolor="#E8E5DC",
+                showgrid=True,
+                zeroline=False,
+            ),
+            yaxis=dict(
+                gridcolor="#E8E5DC",
+                showgrid=True,
+                zeroline=False,
+                range=[0, 105],  # Show 0-100% with slight padding
+            ),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)

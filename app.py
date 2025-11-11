@@ -1080,6 +1080,15 @@ def main():
 
                 st.dataframe(top_seasons, use_container_width=True)
 
+                # Section 4: Winning Percentage by Points Scored
+                st.markdown("### 📊 Winning Percentage by Points Scored")
+                st.write(
+                    "How likely is a team to win based on their score? "
+                    "Each line represents a different year, showing the relationship between points scored and winning percentage."
+                )
+
+                dashboard.create_win_pct_by_points_chart(historical_df)
+
             else:
                 st.warning("No historical data available for records analysis.")
 
