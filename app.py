@@ -1102,20 +1102,21 @@ def main():
                 """
             )
 
-            # Year selector
+            # Year selector - default to current year
             selected_year = st.selectbox(
                 "Select Year",
                 options=list(range(config.year, 2005, -1)),
+                index=0,  # Default to current year (first option)
                 key="schedule_impact_year",
             )
 
-            # Load historical matchup data for selected year
+            # Load historical matchup data for selected year only
             from gmb.taylor_eras import get_historical_matchups_with_opponents
 
             historical_df = get_historical_matchups_with_opponents(
                 league_id=config.league_id,
-                start_year=2006,
-                end_year=config.year,
+                start_year=selected_year,
+                end_year=selected_year,
                 espn_s2=config.espn_s2,
                 swid=config.swid,
             )
