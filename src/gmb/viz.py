@@ -1577,3 +1577,313 @@ class FantasyDashboard:
                 )
 
         return pd.DataFrame(results)
+
+    def get_remaining_schedule(self, current_week: int, total_weeks: int = 14) -> pd.DataFrame:
+        """Get remaining matchups for the regular season.
+
+        Args:
+            current_week: The current week number
+            total_weeks: Total regular season weeks (default 14)
+
+        Returns:
+            DataFrame with remaining matchups: week, team1, team2
+        """
+        remaining_matchups = []
+
+        for week in range(current_week + 1, total_weeks + 1):
+            try:
+                week_matchups = self.league.get_matchups(week=week)
+                if not week_matchups.empty:
+                    # Get unique matchups (each game appears twice, once per team)
+                    seen_pairs: set[tuple[str, str]] = set()
+                    for _, row in week_matchups.iterrows():
+                        pair = tuple(sorted([row["team_name"], row["opponent_name"]]))
+                        if pair not in seen_pairs:
+                            seen_pairs.add(pair)
+                            remaining_matchups.append(
+                                {
+                                    "week": week,
+                                    "team1": pair[0],
+                                    "team2": pair[1],
+                                }
+                            )
+            except Exception:
+                continue
+
+        return pd.DataFrame(remaining_matchups)
+
+    def calculate_standings_with_scenarios(
+        self,
+        scenario_scores: dict[int, dict[str, float]],
+    ) -> pd.DataFrame:
+        """Calculate final standings based on scenario scores.
+
+        Args:
+            scenario_scores: Dict of week -> {team_name: score}
+
+        Returns:
+            DataFrame with projected final standings
+        """
+        if self.teams_df is None or self.matchups_df is None:
+            self.load_data()
+        if self.teams_df is None or self.matchups_df is None:
+            raise ValueError("Failed to load data")
+
+        # Start with current standings
+        standings = self.teams_df[["team_name", "wins", "losses", "points_for"]].copy()
+        standings = standings.rename(
+            columns={
+                "wins": "current_wins",
+                "losses": "current_losses",
+                "points_for": "current_points",
+            }
+        )
+
+        # Initialize projected columns
+        standings["projected_wins"] = standings["current_wins"].astype(float)
+        standings["projected_losses"] = standings["current_losses"].astype(float)
+        standings["projected_points"] = standings["current_points"].astype(float)
+
+        # Process each week's scenarios
+        for week, scores in scenario_scores.items():
+            # Get schedule for this week (supports future weeks)
+            try:
+                week_schedule = self.league.get_schedule(week=week)
+            except Exception:
+                continue
+
+            if week_schedule.empty:
+                continue
+
+            # Process each unique matchup
+            seen_pairs: set[tuple[str, str]] = set()
+            for _, row in week_schedule.iterrows():
+                pair = tuple(sorted([row["team_name"], row["opponent_name"]]))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+
+                team1, team2 = pair
+                score1 = scores.get(team1, 0)
+                score2 = scores.get(team2, 0)
+
+                # Update points
+                standings.loc[standings["team_name"] == team1, "projected_points"] += score1
+                standings.loc[standings["team_name"] == team2, "projected_points"] += score2
+
+                # Determine winner
+                if score1 > score2:
+                    standings.loc[standings["team_name"] == team1, "projected_wins"] += 1
+                    standings.loc[standings["team_name"] == team2, "projected_losses"] += 1
+                elif score2 > score1:
+                    standings.loc[standings["team_name"] == team2, "projected_wins"] += 1
+                    standings.loc[standings["team_name"] == team1, "projected_losses"] += 1
+                else:
+                    # Tie - split the difference
+                    standings.loc[standings["team_name"] == team1, "projected_wins"] += 0.5
+                    standings.loc[standings["team_name"] == team1, "projected_losses"] += 0.5
+                    standings.loc[standings["team_name"] == team2, "projected_wins"] += 0.5
+                    standings.loc[standings["team_name"] == team2, "projected_losses"] += 0.5
+
+        # Sort by wins, then points for tiebreaker
+        standings = standings.sort_values(
+            ["projected_wins", "projected_points"], ascending=[False, False]
+        ).reset_index(drop=True)
+
+        # Add playoff seed
+        standings["seed"] = range(1, len(standings) + 1)
+
+        return standings
+
+    def create_playoff_bracket_chart(
+        self,
+        standings: pd.DataFrame,
+        num_playoff_teams: int = 6,
+    ) -> None:
+        """Create playoff bracket visualization.
+
+        Args:
+            standings: DataFrame with projected standings including seed
+            num_playoff_teams: Number of teams that make playoffs
+        """
+        playoff_teams = standings.head(num_playoff_teams).copy()
+
+        # Create bracket visualization using Plotly
+        fig = go.Figure()
+
+        # Define bracket positions
+        # For 6-team playoff: Seeds 1-2 get byes, 3v6 and 4v5 play first round
+        bracket_config = {
+            6: {
+                "first_round": [(3, 6), (4, 5)],
+                "byes": [1, 2],
+                "round_names": ["Wild Card", "Semifinals", "Championship"],
+            },
+            4: {
+                "first_round": [(1, 4), (2, 3)],
+                "byes": [],
+                "round_names": ["Semifinals", "Championship"],
+            },
+        }
+
+        config = bracket_config.get(num_playoff_teams, bracket_config[6])
+
+        # Draw bracket boxes
+        y_positions = {
+            "first_round": [3, 1],
+            "semis": [3.5, 1.5],
+            "finals": [2.5],
+        }
+
+        x_positions = {
+            "first_round": 0,
+            "semis": 2,
+            "finals": 4,
+        }
+
+        # Colors for playoff teams
+        colors = ["#FFD700", "#C0C0C0", "#CD7F32", "#4A7C59", "#2D5F3F", "#1A3329"]
+
+        # First round matchups
+        for i, (seed_a, seed_b) in enumerate(config["first_round"]):
+            team_a = playoff_teams[playoff_teams["seed"] == seed_a].iloc[0]
+            team_b = playoff_teams[playoff_teams["seed"] == seed_b].iloc[0]
+
+            y_pos = y_positions["first_round"][i]
+
+            # Add matchup box
+            fig.add_shape(
+                type="rect",
+                x0=x_positions["first_round"] - 0.8,
+                x1=x_positions["first_round"] + 0.8,
+                y0=y_pos - 0.4,
+                y1=y_pos + 0.4,
+                line=dict(color="#2D5F3F", width=2),
+                fillcolor="#FAFAF8",
+            )
+
+            # Add team labels
+            fig.add_annotation(
+                x=x_positions["first_round"],
+                y=y_pos + 0.15,
+                text=f"({seed_a}) {team_a['team_name'][:20]}",
+                showarrow=False,
+                font=dict(size=11, color=colors[seed_a - 1]),
+            )
+            fig.add_annotation(
+                x=x_positions["first_round"],
+                y=y_pos - 0.15,
+                text=f"({seed_b}) {team_b['team_name'][:20]}",
+                showarrow=False,
+                font=dict(size=11, color=colors[seed_b - 1]),
+            )
+
+            # Draw line to semifinals
+            fig.add_shape(
+                type="line",
+                x0=x_positions["first_round"] + 0.8,
+                y0=y_pos,
+                x1=x_positions["semis"] - 0.8,
+                y1=y_positions["semis"][i],
+                line=dict(color="#6c757d", width=1, dash="dot"),
+            )
+
+        # Bye teams (semifinals)
+        for i, seed in enumerate(config["byes"]):
+            team = playoff_teams[playoff_teams["seed"] == seed].iloc[0]
+            y_pos = y_positions["semis"][i]
+
+            fig.add_shape(
+                type="rect",
+                x0=x_positions["semis"] - 0.8,
+                x1=x_positions["semis"] + 0.8,
+                y0=y_pos - 0.4,
+                y1=y_pos + 0.4,
+                line=dict(color="#FFD700" if seed == 1 else "#C0C0C0", width=2),
+                fillcolor="#FAFAF8",
+            )
+            fig.add_annotation(
+                x=x_positions["semis"],
+                y=y_pos + 0.15,
+                text=f"({seed}) {team['team_name'][:20]} (BYE)",
+                showarrow=False,
+                font=dict(size=11, color=colors[seed - 1]),
+            )
+            fig.add_annotation(
+                x=x_positions["semis"],
+                y=y_pos - 0.15,
+                text="vs Winner",
+                showarrow=False,
+                font=dict(size=10, color="#6c757d"),
+            )
+
+            # Draw line to finals
+            fig.add_shape(
+                type="line",
+                x0=x_positions["semis"] + 0.8,
+                y0=y_pos,
+                x1=x_positions["finals"] - 0.8,
+                y1=y_positions["finals"][0],
+                line=dict(color="#6c757d", width=1, dash="dot"),
+            )
+
+        # Championship box
+        fig.add_shape(
+            type="rect",
+            x0=x_positions["finals"] - 0.8,
+            x1=x_positions["finals"] + 0.8,
+            y0=y_positions["finals"][0] - 0.4,
+            y1=y_positions["finals"][0] + 0.4,
+            line=dict(color="#FFD700", width=3),
+            fillcolor="#FAFAF8",
+        )
+        fig.add_annotation(
+            x=x_positions["finals"],
+            y=y_positions["finals"][0],
+            text="🏆 Championship",
+            showarrow=False,
+            font=dict(size=14, color="#1A3329"),
+        )
+
+        # Round labels
+        round_x_positions = [
+            x_positions["first_round"],
+            x_positions["semis"],
+            x_positions["finals"],
+        ]
+        for i, round_name in enumerate(config["round_names"]):
+            fig.add_annotation(
+                x=round_x_positions[i],
+                y=4.5,
+                text=round_name,
+                showarrow=False,
+                font=dict(size=14, color="#1A3329"),
+            )
+
+        fig.update_layout(
+            title="Projected Playoff Bracket",
+            showlegend=False,
+            xaxis=dict(visible=False, range=[-1.5, 5.5]),
+            yaxis=dict(visible=False, range=[0, 5]),
+            plot_bgcolor="#FAFAF8",
+            paper_bgcolor="#FAFAF8",
+            height=450,
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    def get_team_average_scores(self) -> dict[str, float]:
+        """Calculate average score per team this season.
+
+        Returns:
+            Dict mapping team_name to average score
+        """
+        if self.matchups_df is None:
+            self.load_data()
+        if self.matchups_df is None:
+            return {}
+
+        # Only include weeks with actual scores
+        scored_matchups = self.matchups_df[self.matchups_df["points"] > 0]
+
+        return scored_matchups.groupby("team_name")["points"].mean().to_dict()

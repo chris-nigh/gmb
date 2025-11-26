@@ -220,3 +220,44 @@ class ESPNFantasyLeague:
         df["team_name"] = df["team_name"].map(team_names)
         df["opponent_name"] = df["opponent_name"].map(team_names)
         return df
+
+    def get_schedule(self, week: int) -> pd.DataFrame:
+        """Get schedule for a specific week (including future weeks).
+
+        Unlike get_matchups, this method can fetch future week schedules.
+
+        Args:
+            week: Week number to get schedule for
+
+        Returns:
+            DataFrame with columns: week, team_name, opponent_name
+        """
+        # Get team name mappings
+        teams = self.get_teams()
+        team_names = {team["team_id"]: team["team_name"] for _, team in teams.iterrows()}
+
+        separator = "&" if self.year < 2018 else "?"
+        url = f"{self.base_url}{separator}view=mMatchup&scoringPeriodId={week}"
+        response = requests.get(url, cookies=self.cookies, timeout=REQUEST_TIMEOUT)
+
+        if response.status_code != 200:
+            return pd.DataFrame(columns=["week", "team_name", "opponent_name"])
+
+        data = response.json()
+
+        # For pre-2018, the API returns an array with one league object
+        if self.year < 2018 and isinstance(data, list):
+            data = data[0] if data else {}
+
+        matchups = self._extract_matchups(data, week)
+
+        if not matchups:
+            return pd.DataFrame(columns=["week", "team_name", "opponent_name"])
+
+        # Convert to DataFrame and map team IDs to names
+        df = pd.DataFrame(matchups)
+        df["team_name"] = df["team_name"].map(team_names)
+        df["opponent_name"] = df["opponent_name"].map(team_names)
+
+        # Return only schedule columns (no scores)
+        return df[["week", "team_name", "opponent_name"]]
