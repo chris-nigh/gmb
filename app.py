@@ -11,6 +11,9 @@ from gmb.keeper_constants import GO_BACK_YEARS
 from gmb.oiwp import calculate_oiwp_stats
 from gmb.viz import FantasyDashboard
 
+# League inception year (first year of historical data)
+LEAGUE_START_YEAR = 2006
+
 
 def apply_vermont_styling():
     """Apply Vermont Green Mountains theme with custom CSS."""
@@ -185,17 +188,18 @@ def main():
                 st.metric("Highest Scorer", str(highest_scorer))
 
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(
             [
                 "📊 Overview",
                 "🤝 Head-to-Head Records",
                 "🎯 OIWP Analysis",
+                "🏈 Playoff Scenarios",
                 "🔒 Keepers",
                 "🎲 Keeper What-If",
-                "📋 Draft Analysis",
                 "✨ Taylor's Eras",
                 "🏆 Historical Records",
                 "📅 Schedule Impact",
+                "📋 Draft Analysis",
             ]
         )
 
@@ -252,11 +256,13 @@ def main():
                 # Get current year from config
                 year = config.year
 
-                # Load historical data from 2006 to current year
-                with st.spinner("Loading historical head-to-head data (2006-present)..."):
+                # Load historical data from league start to current year
+                with st.spinner(
+                    f"Loading historical head-to-head data ({LEAGUE_START_YEAR}-present)..."
+                ):
                     historical_df = load_h2h_historical_data(
                         league_id=config.league_id,
-                        start_year=2006,
+                        start_year=LEAGUE_START_YEAR,
                         end_year=year,
                         espn_s2=config.espn_s2,
                         swid=config.swid,
@@ -265,7 +271,7 @@ def main():
                 if not historical_df.empty:
                     # Create heatmap with historical data
                     st.markdown(
-                        "### Historical Head-to-Head Win Percentage Matrix (by Owner, 2006-Present)"
+                        f"### Historical Head-to-Head Win Percentage Matrix (by Owner, {LEAGUE_START_YEAR}-Present)"
                     )
                     st.write(
                         "This heatmap shows the winning percentage of each owner against every other owner "
@@ -411,7 +417,7 @@ def main():
             else:
                 st.warning("Matchup data not available for OIWP calculation")
 
-        with tab4:
+        with tab5:  # Keepers (moved from position 4)
             st.subheader("Keeper Eligibility Summary")
 
             # Add a cache for keeper data to avoid reloading
@@ -529,13 +535,13 @@ def main():
                     "No keeper data available. Make sure your league has keeper settings enabled."
                 )
 
-        with tab5:
+        with tab6:  # Keeper What-If (moved from position 5)
             st.subheader("Keeper What-If Tool")
             st.write(
                 "Experiment with different keeper combinations to see their impact on your draft budget and roster."
             )
 
-            # Reuse the keeper data from tab4
+            # Reuse the keeper data from tab5
             keeper_data = load_keeper_data(
                 config.league_id, config.year, config.espn_s2, config.swid
             )
@@ -694,7 +700,7 @@ def main():
             else:
                 st.warning("No keeper data available for what-if analysis.")
 
-        with tab6:
+        with tab10:  # Draft Analysis (moved from position 6)
             st.subheader("Draft Analysis")
 
             # Cache draft data
@@ -896,7 +902,7 @@ def main():
 
             # Get current year from config
             year = config.year
-            start_year = 2006  # League inception
+            start_year = LEAGUE_START_YEAR
             end_year = year
 
             # Load historical matchup data
@@ -1251,6 +1257,235 @@ def main():
                     st.warning(f"No data available for {config.year}")
             else:
                 st.warning("No historical data available for schedule analysis.")
+
+        with tab4:  # Playoff Scenarios (moved from position 10)
+            st.header("🏈 Playoff Scenario Calculator")
+            st.markdown(
+                """
+                Explore different scenarios for the final weeks of the regular season.
+                Enter projected scores for each matchup to see how they affect the playoff picture.
+                """
+            )
+
+            # Configuration
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                current_week = league.get_current_week()
+                st.info(f"Current Week: {current_week}")
+            with col2:
+                total_weeks = st.number_input(
+                    "Regular Season Weeks",
+                    min_value=current_week,
+                    max_value=17,
+                    value=14,
+                    help="Total number of regular season weeks before playoffs",
+                )
+            with col3:
+                num_playoff_teams = st.selectbox(
+                    "Playoff Teams",
+                    options=[4, 6],
+                    index=1,
+                    help="How many teams make the playoffs?",
+                )
+
+            # Get remaining schedule (including current week)
+            remaining_weeks = list(range(current_week, int(total_weeks) + 1))
+
+            if not remaining_weeks:
+                st.warning("Regular season is complete! No remaining games to simulate.")
+            else:
+                st.subheader(
+                    f"Remaining Matchups (Weeks {remaining_weeks[0]}-{remaining_weeks[-1]})"
+                )
+
+                # Get score presets for quick-fill buttons
+                avg_scores = dashboard.get_team_average_scores()
+                last_week_scores = dashboard.get_team_last_week_scores()
+                highest_scores = dashboard.get_team_highest_scores()
+                lowest_scores = dashboard.get_team_lowest_scores()
+
+                # Helper function to update all scores for a week
+                def apply_scores_to_week(week: int, scores: dict[str, float]) -> None:
+                    """Apply a set of scores to all teams in a week."""
+                    for team_name, score in scores.items():
+                        key = f"week{week}_{team_name}"
+                        if key in st.session_state:
+                            st.session_state[key] = round(score, 1)
+
+                # Create score inputs for each remaining week
+                scenario_scores: dict[int, dict[str, float]] = {}
+
+                for week in remaining_weeks:
+                    st.markdown(f"### Week {week}")
+
+                    # Quick-fill buttons for this week
+                    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
+                    with btn_col1:
+                        if st.button(
+                            "📊 Average", key=f"avg_btn_{week}", help="Use season average"
+                        ):
+                            apply_scores_to_week(week, avg_scores)
+                            st.rerun()
+                    with btn_col2:
+                        if st.button(
+                            "📅 Last Week", key=f"last_btn_{week}", help="Use last week's scores"
+                        ):
+                            apply_scores_to_week(week, last_week_scores)
+                            st.rerun()
+                    with btn_col3:
+                        if st.button(
+                            "🔥 Highest", key=f"high_btn_{week}", help="Use season-high scores"
+                        ):
+                            apply_scores_to_week(week, highest_scores)
+                            st.rerun()
+                    with btn_col4:
+                        if st.button(
+                            "❄️ Lowest", key=f"low_btn_{week}", help="Use season-low scores"
+                        ):
+                            apply_scores_to_week(week, lowest_scores)
+                            st.rerun()
+
+                    try:
+                        # Use get_schedule for future weeks, get_matchups for current/past
+                        week_schedule = league.get_schedule(week=week)
+                    except Exception as e:
+                        st.warning(f"Could not load schedule for week {week}: {e}")
+                        continue
+
+                    if week_schedule.empty:
+                        st.warning(f"No matchups found for week {week}")
+                        continue
+
+                    scenario_scores[week] = {}
+
+                    # Get unique matchups
+                    seen_pairs: set[tuple[str, str]] = set()
+                    matchup_list: list[tuple[str, str]] = []
+                    for _, row in week_schedule.iterrows():
+                        pair = tuple(sorted([row["team_name"], row["opponent_name"]]))
+                        if pair not in seen_pairs:
+                            seen_pairs.add(pair)
+                            matchup_list.append(pair)
+
+                    # Create columns for matchups
+                    for team1, team2 in matchup_list:
+                        col1, col2, col3 = st.columns([2, 1, 2])
+
+                        # Initialize session state with average scores if not already set
+                        key1 = f"week{week}_{team1}"
+                        key2 = f"week{week}_{team2}"
+                        if key1 not in st.session_state:
+                            st.session_state[key1] = round(avg_scores.get(team1, 100.0), 1)
+                        if key2 not in st.session_state:
+                            st.session_state[key2] = round(avg_scores.get(team2, 100.0), 1)
+
+                        with col1:
+                            score1 = st.number_input(
+                                f"{team1}",
+                                min_value=0.0,
+                                max_value=300.0,
+                                step=0.1,
+                                key=key1,
+                            )
+                            scenario_scores[week][team1] = score1
+
+                        with col2:
+                            st.markdown(
+                                "<div style='text-align: center; padding-top: 30px;'><b>vs</b></div>",
+                                unsafe_allow_html=True,
+                            )
+
+                        with col3:
+                            score2 = st.number_input(
+                                f"{team2}",
+                                min_value=0.0,
+                                max_value=300.0,
+                                step=0.1,
+                                key=key2,
+                            )
+                            scenario_scores[week][team2] = score2
+
+                    st.markdown("---")
+
+                # Calculate and display results
+                if st.button("Calculate Playoff Picture", type="primary"):
+                    if not scenario_scores:
+                        st.error("No matchup data available. Cannot calculate playoff scenarios.")
+                    else:
+                        with st.spinner("Calculating scenarios..."):
+                            projected_standings = dashboard.calculate_standings_with_scenarios(
+                                scenario_scores
+                            )
+
+                        # Display projected standings
+                        st.subheader("Projected Final Standings")
+
+                        # Format display
+                        display_standings = projected_standings.copy()
+                        display_standings["record"] = (
+                            display_standings["projected_wins"].astype(int).astype(str)
+                            + "-"
+                            + display_standings["projected_losses"].astype(int).astype(str)
+                        )
+                        display_standings["projected_points"] = display_standings[
+                            "projected_points"
+                        ].round(1)
+
+                        # Highlight playoff teams
+                        def highlight_playoff(row: pd.Series) -> list[str]:
+                            if row["Seed"] <= num_playoff_teams:
+                                if row["Seed"] <= 2:
+                                    return ["background-color: #d4edda"] * len(row)  # Green for bye
+                                return ["background-color: #fff3cd"] * len(
+                                    row
+                                )  # Yellow for playoff
+                            return [""] * len(row)
+
+                        display_cols = ["seed", "team_name", "record", "projected_points"]
+                        display_df = display_standings[display_cols].copy()
+                        display_df.columns = ["Seed", "Team", "Record", "Total Points"]
+
+                        styled_df = display_df.style.apply(highlight_playoff, axis=1)
+                        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
+                        # Legend
+                        st.markdown(
+                            "🟢 **First-round bye** | 🟡 **Playoff team** | ⚪ **Eliminated**"
+                        )
+
+                        # Playoff bracket
+                        st.subheader("Projected Playoff Bracket")
+                        dashboard.create_playoff_bracket_chart(
+                            projected_standings, num_playoff_teams=num_playoff_teams
+                        )
+
+                        # Playoff race summary
+                        st.subheader("Playoff Race Analysis")
+
+                        playoff_teams = projected_standings.head(num_playoff_teams)
+                        bubble_teams = projected_standings.iloc[
+                            num_playoff_teams - 2 : num_playoff_teams + 2
+                        ]
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("**Clinched Playoff Berth:**")
+                            for _, team in playoff_teams.iterrows():
+                                seed = int(team["seed"])
+                                emoji = "🥇" if seed == 1 else "🥈" if seed == 2 else "🏈"
+                                st.write(f"{emoji} ({seed}) {team['team_name']}")
+
+                        with col2:
+                            st.markdown("**Bubble Watch:**")
+                            for _, team in bubble_teams.iterrows():
+                                seed = int(team["seed"])
+                                status = "IN" if seed <= num_playoff_teams else "OUT"
+                                color = "green" if status == "IN" else "red"
+                                st.markdown(
+                                    f"({seed}) {team['team_name']} - "
+                                    f"<span style='color: {color};'>{status}</span>",
+                                    unsafe_allow_html=True,
+                                )
 
     except ValueError as e:
         st.error(f"Configuration Error: {e}")
