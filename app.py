@@ -1267,6 +1267,28 @@ def main():
                 """
             )
 
+            # Cache score presets to avoid recalculating on every render
+            @st.cache_data(ttl=300)
+            def get_score_presets(
+                _league_id: int, _year: int
+            ) -> tuple[dict[str, float], dict[str, float], dict[str, float], dict[str, float]]:
+                """Get all score presets (cached)."""
+                return (
+                    dashboard.get_team_average_scores(),
+                    dashboard.get_team_last_week_scores(),
+                    dashboard.get_team_highest_scores(),
+                    dashboard.get_team_lowest_scores(),
+                )
+
+            # Cache schedule data
+            @st.cache_data(ttl=300)
+            def get_week_schedule(_league_id: int, _year: int, week: int) -> pd.DataFrame:
+                """Get schedule for a specific week (cached)."""
+                try:
+                    return league.get_schedule(week=week)
+                except Exception:
+                    return pd.DataFrame()
+
             # Configuration
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -1298,19 +1320,22 @@ def main():
                     f"Remaining Matchups (Weeks {remaining_weeks[0]}-{remaining_weeks[-1]})"
                 )
 
-                # Get score presets for quick-fill buttons
-                avg_scores = dashboard.get_team_average_scores()
-                last_week_scores = dashboard.get_team_last_week_scores()
-                highest_scores = dashboard.get_team_highest_scores()
-                lowest_scores = dashboard.get_team_lowest_scores()
+                # Get score presets for quick-fill buttons (cached)
+                avg_scores, last_week_scores, highest_scores, lowest_scores = get_score_presets(
+                    config.league_id, config.year
+                )
 
-                # Helper function to update all scores for a week
+                # Pre-load all week schedules (cached)
+                week_schedules: dict[int, pd.DataFrame] = {}
+                for week in remaining_weeks:
+                    week_schedules[week] = get_week_schedule(config.league_id, config.year, week)
+
+                # Helper function to update all scores for a week (used as callback)
                 def apply_scores_to_week(week: int, scores: dict[str, float]) -> None:
                     """Apply a set of scores to all teams in a week."""
                     for team_name, score in scores.items():
                         key = f"week{week}_{team_name}"
-                        if key in st.session_state:
-                            st.session_state[key] = round(score, 1)
+                        st.session_state[key] = round(score, 1)
 
                 # Create score inputs for each remaining week
                 scenario_scores: dict[int, dict[str, float]] = {}
@@ -1318,40 +1343,42 @@ def main():
                 for week in remaining_weeks:
                     st.markdown(f"### Week {week}")
 
-                    # Quick-fill buttons for this week
+                    # Quick-fill buttons for this week (using on_click callbacks)
                     btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
                     with btn_col1:
-                        if st.button(
-                            "📊 Average", key=f"avg_btn_{week}", help="Use season average"
-                        ):
-                            apply_scores_to_week(week, avg_scores)
-                            st.rerun()
+                        st.button(
+                            "📊 Average",
+                            key=f"avg_btn_{week}",
+                            help="Use season average",
+                            on_click=apply_scores_to_week,
+                            args=(week, avg_scores),
+                        )
                     with btn_col2:
-                        if st.button(
-                            "📅 Last Week", key=f"last_btn_{week}", help="Use last week's scores"
-                        ):
-                            apply_scores_to_week(week, last_week_scores)
-                            st.rerun()
+                        st.button(
+                            "📅 Last Week",
+                            key=f"last_btn_{week}",
+                            help="Use last week's scores",
+                            on_click=apply_scores_to_week,
+                            args=(week, last_week_scores),
+                        )
                     with btn_col3:
-                        if st.button(
-                            "🔥 Highest", key=f"high_btn_{week}", help="Use season-high scores"
-                        ):
-                            apply_scores_to_week(week, highest_scores)
-                            st.rerun()
+                        st.button(
+                            "🔥 Highest",
+                            key=f"high_btn_{week}",
+                            help="Use season-high scores",
+                            on_click=apply_scores_to_week,
+                            args=(week, highest_scores),
+                        )
                     with btn_col4:
-                        if st.button(
-                            "❄️ Lowest", key=f"low_btn_{week}", help="Use season-low scores"
-                        ):
-                            apply_scores_to_week(week, lowest_scores)
-                            st.rerun()
+                        st.button(
+                            "❄️ Lowest",
+                            key=f"low_btn_{week}",
+                            help="Use season-low scores",
+                            on_click=apply_scores_to_week,
+                            args=(week, lowest_scores),
+                        )
 
-                    try:
-                        # Use get_schedule for future weeks, get_matchups for current/past
-                        week_schedule = league.get_schedule(week=week)
-                    except Exception as e:
-                        st.warning(f"Could not load schedule for week {week}: {e}")
-                        continue
-
+                    week_schedule = week_schedules[week]
                     if week_schedule.empty:
                         st.warning(f"No matchups found for week {week}")
                         continue
