@@ -1,11 +1,22 @@
 """Visualization components for GMB fantasy football dashboard."""
 
+from dataclasses import dataclass
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
 from .espn import ESPNFantasyLeague
+
+
+@dataclass
+class BracketConfig:
+    """Configuration for playoff bracket visualization."""
+
+    first_round: list[tuple[int, int]]
+    byes: list[int]
+    round_names: list[str]
 
 
 class FantasyDashboard:
@@ -1578,40 +1589,6 @@ class FantasyDashboard:
 
         return pd.DataFrame(results)
 
-    def get_remaining_schedule(self, current_week: int, total_weeks: int = 14) -> pd.DataFrame:
-        """Get remaining matchups for the regular season.
-
-        Args:
-            current_week: The current week number
-            total_weeks: Total regular season weeks (default 14)
-
-        Returns:
-            DataFrame with remaining matchups: week, team1, team2
-        """
-        remaining_matchups = []
-
-        for week in range(current_week + 1, total_weeks + 1):
-            try:
-                week_matchups = self.league.get_matchups(week=week)
-                if not week_matchups.empty:
-                    # Get unique matchups (each game appears twice, once per team)
-                    seen_pairs: set[tuple[str, str]] = set()
-                    for _, row in week_matchups.iterrows():
-                        pair = tuple(sorted([row["team_name"], row["opponent_name"]]))
-                        if pair not in seen_pairs:
-                            seen_pairs.add(pair)
-                            remaining_matchups.append(
-                                {
-                                    "week": week,
-                                    "team1": pair[0],
-                                    "team2": pair[1],
-                                }
-                            )
-            except Exception:
-                continue
-
-        return pd.DataFrame(remaining_matchups)
-
     def calculate_standings_with_scenarios(
         self,
         scenario_scores: dict[int, dict[str, float]],
@@ -1713,39 +1690,39 @@ class FantasyDashboard:
 
         # Define bracket positions
         # For 6-team playoff: Seeds 1-2 get byes, 3v6 and 4v5 play first round
-        bracket_config = {
-            6: {
-                "first_round": [(3, 6), (4, 5)],
-                "byes": [1, 2],
-                "round_names": ["Wild Card", "Semifinals", "Championship"],
-            },
-            4: {
-                "first_round": [(1, 4), (2, 3)],
-                "byes": [],
-                "round_names": ["Semifinals", "Championship"],
-            },
+        bracket_configs: dict[int, BracketConfig] = {
+            6: BracketConfig(
+                first_round=[(3, 6), (4, 5)],
+                byes=[1, 2],
+                round_names=["Wild Card", "Semifinals", "Championship"],
+            ),
+            4: BracketConfig(
+                first_round=[(1, 4), (2, 3)],
+                byes=[],
+                round_names=["Semifinals", "Championship"],
+            ),
         }
 
-        config = bracket_config.get(num_playoff_teams, bracket_config[6])
+        config = bracket_configs.get(num_playoff_teams, bracket_configs[6])
 
         # Draw bracket boxes
-        y_positions = {
-            "first_round": [3, 1],
+        y_positions: dict[str, list[float]] = {
+            "first_round": [3.0, 1.0],
             "semis": [3.5, 1.5],
             "finals": [2.5],
         }
 
-        x_positions = {
-            "first_round": 0,
-            "semis": 2,
-            "finals": 4,
+        x_positions: dict[str, float] = {
+            "first_round": 0.0,
+            "semis": 2.0,
+            "finals": 4.0,
         }
 
         # Colors for playoff teams
         colors = ["#FFD700", "#C0C0C0", "#CD7F32", "#4A7C59", "#2D5F3F", "#1A3329"]
 
         # First round matchups
-        for i, (seed_a, seed_b) in enumerate(config["first_round"]):
+        for i, (seed_a, seed_b) in enumerate(config.first_round):
             team_a = playoff_teams[playoff_teams["seed"] == seed_a].iloc[0]
             team_b = playoff_teams[playoff_teams["seed"] == seed_b].iloc[0]
 
@@ -1789,7 +1766,7 @@ class FantasyDashboard:
             )
 
         # Bye teams (semifinals)
-        for i, seed in enumerate(config["byes"]):
+        for i, seed in enumerate(config.byes):
             team = playoff_teams[playoff_teams["seed"] == seed].iloc[0]
             y_pos = y_positions["semis"][i]
 
@@ -1851,7 +1828,7 @@ class FantasyDashboard:
             x_positions["semis"],
             x_positions["finals"],
         ]
-        for i, round_name in enumerate(config["round_names"]):
+        for i, round_name in enumerate(config.round_names):
             fig.add_annotation(
                 x=round_x_positions[i],
                 y=4.5,
@@ -1886,4 +1863,63 @@ class FantasyDashboard:
         # Only include weeks with actual scores
         scored_matchups = self.matchups_df[self.matchups_df["points"] > 0]
 
-        return scored_matchups.groupby("team_name")["points"].mean().to_dict()
+        result: dict[str, float] = scored_matchups.groupby("team_name")["points"].mean().to_dict()
+        return result
+
+    def get_team_last_week_scores(self) -> dict[str, float]:
+        """Get each team's score from the most recent completed week.
+
+        Returns:
+            Dict mapping team_name to last week's score
+        """
+        if self.matchups_df is None:
+            self.load_data()
+        if self.matchups_df is None:
+            return {}
+
+        # Only include weeks with actual scores
+        scored_matchups = self.matchups_df[self.matchups_df["points"] > 0]
+
+        if scored_matchups.empty:
+            return {}
+
+        # Get the most recent week with scores
+        last_week = scored_matchups["week"].max()
+        last_week_matchups = scored_matchups[scored_matchups["week"] == last_week]
+
+        result: dict[str, float] = last_week_matchups.set_index("team_name")["points"].to_dict()
+        return result
+
+    def get_team_highest_scores(self) -> dict[str, float]:
+        """Get each team's highest score this season.
+
+        Returns:
+            Dict mapping team_name to highest score
+        """
+        if self.matchups_df is None:
+            self.load_data()
+        if self.matchups_df is None:
+            return {}
+
+        # Only include weeks with actual scores
+        scored_matchups = self.matchups_df[self.matchups_df["points"] > 0]
+
+        result: dict[str, float] = scored_matchups.groupby("team_name")["points"].max().to_dict()
+        return result
+
+    def get_team_lowest_scores(self) -> dict[str, float]:
+        """Get each team's lowest score this season.
+
+        Returns:
+            Dict mapping team_name to lowest score
+        """
+        if self.matchups_df is None:
+            self.load_data()
+        if self.matchups_df is None:
+            return {}
+
+        # Only include weeks with actual scores
+        scored_matchups = self.matchups_df[self.matchups_df["points"] > 0]
+
+        result: dict[str, float] = scored_matchups.groupby("team_name")["points"].min().to_dict()
+        return result

@@ -11,6 +11,9 @@ from gmb.keeper_constants import GO_BACK_YEARS
 from gmb.oiwp import calculate_oiwp_stats
 from gmb.viz import FantasyDashboard
 
+# League inception year (first year of historical data)
+LEAGUE_START_YEAR = 2006
+
 
 def apply_vermont_styling():
     """Apply Vermont Green Mountains theme with custom CSS."""
@@ -253,11 +256,13 @@ def main():
                 # Get current year from config
                 year = config.year
 
-                # Load historical data from 2006 to current year
-                with st.spinner("Loading historical head-to-head data (2006-present)..."):
+                # Load historical data from league start to current year
+                with st.spinner(
+                    f"Loading historical head-to-head data ({LEAGUE_START_YEAR}-present)..."
+                ):
                     historical_df = load_h2h_historical_data(
                         league_id=config.league_id,
-                        start_year=2006,
+                        start_year=LEAGUE_START_YEAR,
                         end_year=year,
                         espn_s2=config.espn_s2,
                         swid=config.swid,
@@ -266,7 +271,7 @@ def main():
                 if not historical_df.empty:
                     # Create heatmap with historical data
                     st.markdown(
-                        "### Historical Head-to-Head Win Percentage Matrix (by Owner, 2006-Present)"
+                        f"### Historical Head-to-Head Win Percentage Matrix (by Owner, {LEAGUE_START_YEAR}-Present)"
                     )
                     st.write(
                         "This heatmap shows the winning percentage of each owner against every other owner "
@@ -897,7 +902,7 @@ def main():
 
             # Get current year from config
             year = config.year
-            start_year = 2006  # League inception
+            start_year = LEAGUE_START_YEAR
             end_year = year
 
             # Load historical matchup data
@@ -1293,14 +1298,52 @@ def main():
                     f"Remaining Matchups (Weeks {remaining_weeks[0]}-{remaining_weeks[-1]})"
                 )
 
-                # Get average scores for defaults
+                # Get score presets for quick-fill buttons
                 avg_scores = dashboard.get_team_average_scores()
+                last_week_scores = dashboard.get_team_last_week_scores()
+                highest_scores = dashboard.get_team_highest_scores()
+                lowest_scores = dashboard.get_team_lowest_scores()
+
+                # Helper function to update all scores for a week
+                def apply_scores_to_week(week: int, scores: dict[str, float]) -> None:
+                    """Apply a set of scores to all teams in a week."""
+                    for team_name, score in scores.items():
+                        key = f"week{week}_{team_name}"
+                        if key in st.session_state:
+                            st.session_state[key] = round(score, 1)
 
                 # Create score inputs for each remaining week
                 scenario_scores: dict[int, dict[str, float]] = {}
 
                 for week in remaining_weeks:
                     st.markdown(f"### Week {week}")
+
+                    # Quick-fill buttons for this week
+                    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
+                    with btn_col1:
+                        if st.button(
+                            "📊 Average", key=f"avg_btn_{week}", help="Use season average"
+                        ):
+                            apply_scores_to_week(week, avg_scores)
+                            st.rerun()
+                    with btn_col2:
+                        if st.button(
+                            "📅 Last Week", key=f"last_btn_{week}", help="Use last week's scores"
+                        ):
+                            apply_scores_to_week(week, last_week_scores)
+                            st.rerun()
+                    with btn_col3:
+                        if st.button(
+                            "🔥 Highest", key=f"high_btn_{week}", help="Use season-high scores"
+                        ):
+                            apply_scores_to_week(week, highest_scores)
+                            st.rerun()
+                    with btn_col4:
+                        if st.button(
+                            "❄️ Lowest", key=f"low_btn_{week}", help="Use season-low scores"
+                        ):
+                            apply_scores_to_week(week, lowest_scores)
+                            st.rerun()
 
                     try:
                         # Use get_schedule for future weeks, get_matchups for current/past
@@ -1328,18 +1371,21 @@ def main():
                     for team1, team2 in matchup_list:
                         col1, col2, col3 = st.columns([2, 1, 2])
 
-                        # Default to average scores
-                        default1 = avg_scores.get(team1, 100.0)
-                        default2 = avg_scores.get(team2, 100.0)
+                        # Initialize session state with average scores if not already set
+                        key1 = f"week{week}_{team1}"
+                        key2 = f"week{week}_{team2}"
+                        if key1 not in st.session_state:
+                            st.session_state[key1] = round(avg_scores.get(team1, 100.0), 1)
+                        if key2 not in st.session_state:
+                            st.session_state[key2] = round(avg_scores.get(team2, 100.0), 1)
 
                         with col1:
                             score1 = st.number_input(
                                 f"{team1}",
                                 min_value=0.0,
                                 max_value=300.0,
-                                value=round(default1, 1),
                                 step=0.1,
-                                key=f"week{week}_{team1}",
+                                key=key1,
                             )
                             scenario_scores[week][team1] = score1
 
@@ -1354,9 +1400,8 @@ def main():
                                 f"{team2}",
                                 min_value=0.0,
                                 max_value=300.0,
-                                value=round(default2, 1),
                                 step=0.1,
-                                key=f"week{week}_{team2}",
+                                key=key2,
                             )
                             scenario_scores[week][team2] = score2
 
