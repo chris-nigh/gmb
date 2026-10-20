@@ -11,7 +11,7 @@ class EraDict(TypedDict):
 
     era: str
     start_date: datetime
-    end_date: datetime
+    end_date: datetime | None  # None = ongoing (open-ended) era
 
 
 # Taylor Swift album release dates
@@ -74,7 +74,7 @@ TAYLOR_ERAS: list[EraDict] = [
     {
         "era": "The Life of a Showgirl",
         "start_date": datetime(2025, 10, 3),
-        "end_date": datetime(2025, 12, 31),  # Current era, end date is placeholder
+        "end_date": None,  # Current era, open-ended (ongoing)
     },
 ]
 
@@ -106,7 +106,8 @@ def get_era_for_date(date: datetime) -> str:
         The era name for that date
     """
     for era in TAYLOR_ERAS:
-        if era["start_date"] <= date < era["end_date"]:
+        end = era["end_date"]
+        if era["start_date"] <= date and (end is None or date < end):
             return era["era"]
     return "Unknown Era"
 
@@ -128,8 +129,9 @@ def get_era_for_year(year: int) -> str:
 
     eras_in_season = []
     for era in TAYLOR_ERAS:
-        # Check if this era overlaps with the fantasy season
-        if era["start_date"] <= season_end and era["end_date"] >= season_start:
+        end = era["end_date"]
+        # Check if this era overlaps with the fantasy season (ongoing eras extend forever)
+        if era["start_date"] <= season_end and (end is None or end >= season_start):
             eras_in_season.append(era["era"])
 
     if len(eras_in_season) == 1:
